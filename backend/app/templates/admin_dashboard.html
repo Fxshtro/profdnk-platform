@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Админ{% endblock %}
+{% block body %}
+<header><h1>Администратор</h1><div class="row"><span class="hint">{{ user.full_name }}</span><a class="btn btn-ghost btn-small" href="/panel/logout">Выйти</a></div></header>
+
+<div class="card">
+  <h2>Новый администратор</h2>
+  <form method="post" action="/panel/admin/admins/create">
+    <label>ФИО</label><input name="full_name" required>
+    <label>Почта</label><input name="email" type="email" required>
+    <label>Телефон</label><input name="phone">
+    <label>Пароль (8+)</label><input name="password" type="password" required minlength="8">
+    <div class="row" style="margin-top:1rem;"><button class="btn btn-primary" type="submit">Создать</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Новый психолог</h2>
+  <form method="post" action="/panel/admin/psychologists/create">
+    <label>ФИО</label><input name="full_name" required>
+    <label>Почта (логин)</label><input name="email" type="email" required>
+    <label>Телефон</label><input name="phone">
+    <label>Пароль (8+)</label><input name="password" type="password" required minlength="8">
+    <label>Доступ до</label><input name="access_until" type="datetime-local">
+    <div class="row" style="margin-top:1rem;"><button class="btn btn-primary" type="submit">Создать</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Администраторы</h2>
+  <table><thead><tr><th>ФИО</th><th>Почта</th></tr></thead><tbody>
+    {% for a in admins %}<tr><td>{{ a.full_name }}</td><td>{{ a.email }}</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+
+<div class="card">
+  <h2>Психологи</h2>
+  <table><thead><tr><th>ФИО</th><th>Почта</th><th>Доступ</th><th>Статус</th><th></th></tr></thead><tbody>
+    {% for p in psychologists %}
+    <tr>
+      <td>{{ p.full_name }}</td>
+      <td>{{ p.email }}</td>
+      <td>{% if p.access_expires_at %}{{ p.access_expires_at }}{% else %}без срока{% endif %}</td>
+      <td>{% if p.is_blocked %}<span class="badge-bad">закрыт</span>{% else %}<span class="badge-ok">активен</span>{% endif %}</td>
+      <td>
+        <form method="post" action="/panel/admin/psychologists/{{ p.id }}/close" style="display:inline" onsubmit="return confirm('Закрыть доступ?');"><button class="btn btn-danger btn-small" type="submit">Закрыть доступ</button></form>
+        <form method="post" action="/panel/admin/psychologists/{{ p.id }}/open" style="display:inline"><button class="btn btn-ghost btn-small" type="submit">Открыть</button></form>
+        <form method="post" action="/panel/admin/psychologists/{{ p.id }}/set-access">
+          <input type="datetime-local" name="access_until" style="max-width:200px;display:inline-block">
+          <button class="btn btn-primary btn-small" type="submit">Дата</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

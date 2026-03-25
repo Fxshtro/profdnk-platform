@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ test.title }}{% endblock %}
+{% block body %}
+<header><h1>{{ test.title }}</h1><a class="btn btn-ghost btn-small" href="/panel/psychologist">← Назад</a></header>
+<p class="hint">Прохождение для клиента (без входа): <a href="{{ take_url }}" target="_blank">{{ take_url }}</a></p>
+
+<div class="card">
+  <h2>Шаблоны отчётов DOCX</h2>
+  <p class="hint">Два шаблона: для клиента и для профориентолога. Переменные в шаблоне: client_name, client_email, answers, metrics, metrics_list, questions, test_title, report_kind.</p>
+  <form method="post" action="/panel/psychologist/tests/{{ test.id }}/template/client" enctype="multipart/form-data">
+    <label>Шаблон «клиент» (.docx)</label><input type="file" name="file" accept=".docx"><button class="btn btn-primary btn-small" type="submit">Загрузить</button>
+  </form>
+  <form method="post" action="/panel/psychologist/tests/{{ test.id }}/template/specialist" enctype="multipart/form-data">
+    <label>Шаблон «профориентолог» (.docx)</label><input type="file" name="file" accept=".docx"><button class="btn btn-primary btn-small" type="submit">Загрузить</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Результаты</h2>
+  <p class="hint">DOCX — скачать, HTML — открыть в браузере (с графиком метрик).</p>
+  <table><thead><tr><th>Клиент</th><th>Дата</th><th>Отчёты</th></tr></thead><tbody>
+    {% for s in submissions %}
+    <tr>
+      <td>{{ s.client_name }}<br><span class="hint">{{ s.client_email }}</span></td>
+      <td>{{ s.created_at }}</td>
+      <td>
+        <a target="_blank" href="/panel/psychologist/tests/{{ test.id }}/submissions/{{ s.id }}/report.docx?kind=client">DOCX клиент</a> ·
+        <a target="_blank" href="/panel/psychologist/tests/{{ test.id }}/submissions/{{ s.id }}/report.html?kind=client">HTML клиент</a><br>
+        <a target="_blank" href="/panel/psychologist/tests/{{ test.id }}/submissions/{{ s.id }}/report.docx?kind=specialist">DOCX спец.</a> ·
+        <a target="_blank" href="/panel/psychologist/tests/{{ test.id }}/submissions/{{ s.id }}/report.html?kind=specialist">HTML спец.</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

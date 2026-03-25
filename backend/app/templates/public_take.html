@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ test.title }} — прохождение</title>
+  <link rel="stylesheet" href="/panel/static/panel.css">
+  <style>
+    .progress-wrap { position: sticky; top: 0; z-index: 10; background: #0f1419; padding: 0.75rem 0; border-bottom: 1px solid #2d3a4f; }
+    .progress-bar { height: 12px; background: #2d3a4f; border-radius: 8px; overflow: hidden; }
+    .progress-bar > div { height: 100%; background: #22c55e; width: 0%; transition: width .2s; }
+    .progress-text { font-size: 0.95rem; color: #9aa7bc; margin-top: 0.35rem; }
+    .color-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .color-chip { padding: 0.4rem 0.6rem; border-radius: 8px; border: 2px solid #fff3; cursor: grab; user-select: none; }
+    .section-title { margin-top: 1.5rem; color: #93c5fd; }
+    .err { color: #fecaca; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="progress-wrap">
+      <div class="progress-bar"><div id="progFill"></div></div>
+      <div class="progress-text">Прогресс: <strong id="progPct">0</strong> %</div>
+    </div>
+
+    <h1>{{ test.title }}</h1>
+    {% if test.description %}<p class="hint">{{ test.description }}</p>{% endif %}
+
+    <div id="formErr" class="alert alert-err" style="display:none;"></div>
+    <div id="formOk" class="alert alert-ok" style="display:none;">Спасибо! Ответы сохранены. Можно закрыть страницу.</div>
+
+    <div class="card">
+      <h2>О вас</h2>
+      <label>Имя и фамилия *</label>
+      <input id="c_name" required>
+      <label>Электронная почта *</label>
+      <input id="c_email" type="email" required>
+      <label>Телефон</label>
+      <input id="c_phone" type="tel">
+    </div>
+
+    {% for sec in config.sections %}
+    <h2 class="section-title">{{ sec.title }}</h2>
+    {% for q in sec.questions %}
+    <div class="card q-card" data-qid="{{ q.id }}" data-req="{{ 1 if q.required else 0 }}" data-type="{{ q.type }}">
+      <p><strong>{{ q.text }}</strong>{% if q.required %} *{% endif %}</p>
+
+      {% if q.type == 'text' %}
+        <input class="ans" type="text" data-qid="{{ q.id }}">
+      {% elif q.type == 'textarea' %}
+        <textarea class="ans" rows="4" data-qid="{{ q.id }}"></textarea>
+      {% elif q.type == 'single' %}
+        {% for opt in q.options %}
+        <label><input type="radio" class="ans" name="r_{{ q.id }}" value="{{ opt }}" data-qid="{{ q.id }}"> {{ opt }}</label><br>
+        {% endfor %}
+      {% elif q.type == 'multi' %}
+        {% for opt in q.options %}
+        <label><input type="checkbox" class="ans-cb" value="{{ opt }}" data-qid="{{ q.id }}"> {{ opt }}</label><br>
+        {% endfor %}
+      {% elif q.type == 'yesno' %}
+        <label><input type="radio" class="ans" name="yn_{{ q.id }}" value="yes" data-qid="{{ q.id }}"> Да</label>
+        <label><input type="radio" class="ans" name="yn_{{ q.id }}" value="no" data-qid="{{ q.id }}"> Нет</label>
+      {% elif q.type == 'number' %}
+        <input class="ans" type="number" data-qid="{{ q.id }}"
+          {% if q.min is not none %}min="{{ q.min }}"{% endif %}
+          {% if q.max is not none %}max="{{ q.max }}"{% endif %}
+          {% if q.step is not none %}step="{{ q.step }}"{% endif %}>
+      {% elif q.type == 'slider' %}
+        <input class="ans slider" type="range" data-qid="{{ q.id }}" min="{{ q.min }}" max="{{ q.max }}" step="{{ q.step }}" value="{{ q.min }}">
+        <span class="hint sl-val"></span>
+      {% elif q.type == 'datetime' %}
+        <input class="ans" type="datetime-local" data-qid="{{ q.id }}">
+      {% elif q.type == 'rating' %}
+        <select class="ans" data-qid="{{ q.id }}">
+          {% for i in range(q.scale_min, q.scale_max + 1) %}
+          <option value="{{ i }}">{{ i }}</option>
+          {% endfor %}
+        </select>
+      {% elif q.type == 'color_rank' %}
+        <p class="hint">Перетащите блоки в порядке от наиболее предпочтительного к менее.</p>
+        <div class="color-list" data-qid="{{ q.id }}">
+          {% for c in q.colors %}
+          <div class="color-chip" draggable="true" data-color="{{ c }}" style="background:{{ c }};color:#fff;text-shadow:0 0 4px #000;">{{ c }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% endfor %}
+
+    <div class="row" style="margin:2rem 0;">
+      <button type="button" class="btn btn-primary" id="btnSend">Отправить ответы</button>
+    </div>
+  </div>
+
+<script>
+const TOKEN = {{ token | tojson }};
+
+function requiredQuestions() {
+  return Array.from(document.querySelectorAll('.q-card[data-req="1"]'));
+}
+
+function gatherAnswers() {
+  const out = {};
+  document.querySelectorAll('.q-card').forEach(card => {
+    const qid = card.dataset.qid;
+    const t = card.dataset.type;
+    if (t === 'text' || t === 'textarea' || t === 'number' || t === 'datetime') {
+      const el = card.querySelector('.ans[data-qid="' + qid + '"]');
+      out[qid] = el ? el.value : '';
+    } else if (t === 'single' || t === 'yesno') {
+      const el = card.querySelector('.ans[data-qid="' + qid + '"]:checked');
+      out[qid] = el ? el.value : '';
+    } else if (t === 'multi') {
+      const xs = Array.from(card.querySelectorAll('.ans-cb[data-qid="' + qid + '"]:checked')).map(x => x.value);
+      out[qid] = xs;
+    } else if (t === 'slider' || t === 'rating') {
+      const el = card.querySelector('.ans[data-qid="' + qid + '"]');
+      out[qid] = el ? (t === 'slider' ? Number(el.value) : Number(el.value)) : null;
+    } else if (t === 'color_rank') {
+      const list = card.querySelector('.color-list[data-qid="' + qid + '"]');
+      if (list) {
+        out[qid] = Array.from(list.querySelectorAll('.color-chip')).map(x => x.dataset.color);
+      }
+    }
+  });
+  return out;
+}
+
+function isFilled(card, answers) {
+  const qid = card.dataset.qid;
+  const t = card.dataset.type;
+  const v = answers[qid];
+  if (v === undefined || v === null) return false;
+  if (t === 'multi') return Array.isArray(v) && v.length > 0;
+  if (t === 'color_rank') {
+    const list = card.querySelector('.color-list');
+    const all = Array.from(list.querySelectorAll('.color-chip')).map(x => x.dataset.color);
+    return Array.isArray(v) && v.length === all.length;
+  }
+  if (typeof v === 'string') return v.trim().length > 0;
+  return true;
+}
+
+function updateProgress() {
+  const ans = gatherAnswers();
+  const req = requiredQuestions();
+  const done = req.filter(c => isFilled(c, ans)).length;
+  const pct = req.length ? Math.round((done / req.length) * 100) : 100;
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('progPct').textContent = String(pct);
+}
+
+document.addEventListener('input', updateProgress);
+document.addEventListener('change', updateProgress);
+
+document.querySelectorAll('.slider').forEach(sl => {
+  const show = () => { sl.closest('.q-card').querySelector('.sl-val').textContent = 'Значение: ' + sl.value; };
+  sl.addEventListener('input', show);
+  show();
+});
+
+document.querySelectorAll('.color-list').forEach(list => {
+  let dragEl = null;
+  list.addEventListener('dragover', e => { e.preventDefault(); });
+  list.addEventListener('drop', e => {
+    e.preventDefault();
+    if (dragEl) { list.appendChild(dragEl); updateProgress(); }
+  });
+  list.querySelectorAll('.color-chip').forEach(chip => {
+    chip.addEventListener('dragstart', e => { dragEl = chip; e.dataTransfer.effectAllowed = 'move'; });
+    chip.addEventListener('dragover', e => { e.preventDefault(); });
+    chip.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dragEl || dragEl === chip) return;
+      const children = Array.from(list.children);
+      const ai = children.indexOf(dragEl);
+      const bi = children.indexOf(chip);
+      if (ai < bi) list.insertBefore(dragEl, chip.nextSibling);
+      else list.insertBefore(dragEl, chip);
+      updateProgress();
+    });
+  });
+});
+
+document.getElementById('btnSend').onclick = async () => {
+  document.getElementById('formErr').style.display = 'none';
+  document.getElementById('formOk').style.display = 'none';
+  const body = {
+    client_name: document.getElementById('c_name').value.trim(),
+    client_email: document.getElementById('c_email').value.trim(),
+    client_phone: document.getElementById('c_phone').value.trim() || null,
+    answers: gatherAnswers(),
+  };
+  const res = await fetch('/public/tests/' + encodeURIComponent(TOKEN) + '/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const el = document.getElementById('formErr');
+    el.style.display = 'block';
+    el.textContent = (data.errors || ['Ошибка отправки']).join('; ');
+    return;
+  }
+  document.getElementById('formOk').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+updateProgress();
+</script>
+</body>
+</html>

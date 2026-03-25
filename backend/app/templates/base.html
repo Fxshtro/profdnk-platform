@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Панель{% endblock %}</title>
+  <link rel="stylesheet" href="/panel/static/panel.css">
+</head>
+<body class="{{ body_class or '' }}">
+  <div class="wrap">
+    <div class="row" style="justify-content:flex-end;margin-bottom:0.5rem;">
+      <button type="button" class="btn btn-ghost btn-small" onclick="document.body.classList.toggle('theme-light'); localStorage.setItem('theme', document.body.classList.contains('theme-light')?'light':'dark');">Тема: светлая/тёмная</button>
+    </div>
+    <script>if(localStorage.getItem('theme')==='light')document.body.classList.add('theme-light');</script>
+    {% if alert_ok %}<div class="alert alert-ok">{{ alert_ok }}</div>{% endif %}
+    {% if alert_err %}<div class="alert alert-err">{{ alert_err }}</div>{% endif %}
+    {% block body %}{% endblock %}
+  </div>
+</body>
+</html>

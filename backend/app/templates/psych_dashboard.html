@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Психолог{% endblock %}
+{% block body %}
+<header><h1>Кабинет психолога</h1><div class="row"><a class="btn btn-ghost btn-small" href="/panel/logout">Выйти</a></div></header>
+<p class="hint">{{ user.full_name }} · {{ user.email }}</p>
+
+<div class="card">
+  <h2>Профиль</h2>
+  <form method="post" action="/panel/psychologist/profile" enctype="multipart/form-data">
+    <label>Фото</label><input type="file" name="photo" accept="image/jpeg,image/png,image/webp">
+    <label>О себе (Markdown)</label><textarea name="about_md" rows="6">{{ user.about_md }}</textarea>
+    <p class="hint">{{ markdown_help }}</p>
+    <button class="btn btn-primary" type="submit">Сохранить</button>
+  </form>
+  <p class="hint">Визитка: <a href="{{ card_url }}" target="_blank">{{ card_url }}</a></p>
+</div>
+
+<div class="card">
+  <h2>Опросники</h2>
+  <form method="post" action="/panel/psychologist/tests/create" style="margin-bottom:1rem;">
+    <label>Название нового теста</label>
+    <input name="title" placeholder="Например: Опросник стресса" required>
+    <button class="btn btn-primary" type="submit">Создать и открыть конструктор</button>
+  </form>
+  <table><thead><tr><th>Название</th><th>Ссылка для клиента</th><th></th></tr></thead><tbody>
+    {% for t in tests %}
+    <tr>
+      <td>{{ t.title }}</td>
+      <td><input readonly value="{{ t.link }}" style="max-width:100%;font-size:0.85rem;"></td>
+      <td>
+        <button type="button" class="btn btn-ghost btn-small" onclick="navigator.clipboard.writeText('{{ t.link }}')">Копировать</button>
+        <a class="btn btn-ghost btn-small" href="/panel/psychologist/tests/{{ t.id }}">Результаты</a>
+        <a class="btn btn-ghost btn-small" href="/panel/psychologist/tests/{{ t.id }}/config">JSON</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

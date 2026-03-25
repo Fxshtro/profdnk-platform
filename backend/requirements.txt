@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+python-jose[cryptography]
+bcrypt
+python-multipart
+pydantic-settings
+email-validator
+slowapi
+docxtpl
+qrcode[pil]
+markdown
+bleach
+jinja2
+simpleeval

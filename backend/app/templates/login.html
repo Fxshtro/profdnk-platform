@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Вход{% endblock %}
+{% block body %}
+<header><h1>Вход</h1></header>
+<div class="card">
+  <form method="post" action="/panel/login">
+    <label>Почта</label>
+    <input name="email" type="email" required autocomplete="username">
+    <label>Пароль</label>
+    <input name="password" type="password" required autocomplete="current-password">
+    <div class="row" style="margin-top:1rem;"><button class="btn btn-primary" type="submit">Войти</button></div>
+  </form>
+  <p class="hint">Клиентам для теста вход не нужен — им выдаётся только ссылка.</p>
+</div>
+{% endblock %}

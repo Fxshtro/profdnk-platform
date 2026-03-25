@@ -1,0 +1,112 @@
+@import url("https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Hind+Vadodara:wght@300;400;500;600;700&family=Jost:ital,wght@0,100..900;1,100..900&family=Unbounded:wght@200..900&display=swap");
+@import "tailwindcss";
+
+:root {
+  /* Light theme */
+  --background: #ffffff;
+  --foreground: #171717;
+  --card: #ffffff;
+  --card-foreground: #171717;
+  --popover: #ffffff;
+  --popover-foreground: #171717;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #18181b;
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-jost);
+  --font-mono: var(--font-geist-mono);
+  --font-unbounded: var(--font-unbounded);
+}
+
+/* Dark theme - включается классом .dark */
+.dark {
+  --background: #0a0a0a; 
+  --foreground: #ededed;
+  --card: #171717; 
+  --card-foreground: #edededc9; 
+  --popover: #171717;  
+  --popover-foreground: #ededed; 
+  --primary: #ededed; 
+  --primary-foreground: #0a0a0a;
+  --secondary: #404040;
+  --secondary-foreground: #ededed;
+  --muted: #404040;
+  --muted-foreground: #a1a1aa;
+  --accent: #404040;
+  --accent-foreground: #ededed;
+  --destructive: #b11919;
+  --destructive-foreground: #fef2f2;
+  --border: #404040;
+  --input: #404040;
+  --ring: #d4d4d8;
+} 
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Jost", sans-serif;
+  scroll-behavior: smooth;
+}
+
+.container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  max-width: 1440px;
+}
+
+.container2 {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 2000px;
+} 
+
+@media (min-width: 640px) {
+  .container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+ 
