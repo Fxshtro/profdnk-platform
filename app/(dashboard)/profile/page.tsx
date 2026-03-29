@@ -18,7 +18,6 @@ export default function ProfilePage() {
     full_name: '',
     phone: '',
     about_md: '',
-    experience: '',
   });
 
   const { data: profile, isLoading } = useQuery({
@@ -55,7 +54,6 @@ export default function ProfilePage() {
         full_name: profile.full_name || '',
         phone: profile.phone || '',
         about_md: profile.about_md || '',
-        experience: profile.experience || '',
       });
       setIsEditing(true);
     }
@@ -67,7 +65,6 @@ export default function ProfilePage() {
       full_name: '',
       phone: '',
       about_md: '',
-      experience: '',
     });
   };
 
@@ -212,31 +209,6 @@ export default function ProfilePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="experience">Опыт работы</Label>
-              {isEditing ? (
-                <Textarea
-                  id="experience"
-                  value={formData.experience}
-                  onChange={(e) => handleInputChange('experience', e.target.value)}
-                  placeholder="Например: 5 лет практики, более 1000 консультаций..."
-                  rows={4}
-                />
-              ) : (
-                <div className="rounded-md border p-4">
-                  {profile?.experience ? (
-                    <div className="whitespace-pre-wrap text-sm">
-                      {profile.experience}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground italic">
-                      Информация об опыте не заполнена
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
             {isEditing ? (
               <div className="space-y-2">
                 <Label htmlFor="about_md">Расскажите о себе</Label>

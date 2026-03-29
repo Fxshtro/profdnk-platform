@@ -40,7 +40,6 @@ export interface ProfileUpdatePayload {
   full_name?: string;
   phone?: string;
   about_md?: string;
-  experience?: string;
 }
 
 export interface Test {

@@ -797,7 +797,7 @@ export default function BuilderPage() {
       {/* Overlay для мобильной версии */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-35 lg:hidden"
           onClick={handleCloseSidebar}
         />
       )}
@@ -805,7 +805,7 @@ export default function BuilderPage() {
       {/* Левая панель - палитра элементов */}
       <aside
         className={cn(
-          'fixed lg:static inset-y-0 left-0 z-10 w-full max-w-[85vw] sm:max-w-[400px] lg:max-w-80 border-r bg-background p-4 sm:p-6 overflow-y-auto transition-transform duration-300 ease-in-out',
+          'fixed lg:static inset-y-0 left-0 z-40 w-full max-w-[85vw] sm:max-w-[400px] lg:max-w-80 border-r bg-background p-4 sm:p-6 overflow-y-auto transition-transform duration-300 ease-in-out',
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
@@ -911,14 +911,14 @@ export default function BuilderPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="lg:hidden h-9 w-9 p-0 shrink-0"
+                  className="lg:hidden h-10 w-10 p-0 shrink-0 fixed z-35 border-2 border-primary/50"
                   onClick={handleOpenSidebar}
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </Button>
-                <div>
+                <div className="lg:ml-0 ml-15">
                   <h1 className="text-2xl sm:text-3xl font-unbounded font-bold tracking-tight">
                     {canEditExisting ? 'Редактирование методики' : 'Конструктор методик'}
                   </h1>
@@ -1595,7 +1595,12 @@ export default function BuilderPage() {
               </div>
               <h3 className="text-lg font-semibold">Рабочая область пуста</h3>
               <p className="text-sm text-muted-foreground mt-1 px-4">
-                Перетащите вопросы из левой панели или нажмите на элемент, чтобы добавить его
+                <span className="lg:hidden">
+                  Нажмите на элемент из левой панели, чтобы добавить его
+                </span>
+                <span className="hidden lg:inline">
+                  Перетащите вопросы из левой панели или нажмите на элемент, чтобы добавить его
+                </span>
               </p>
               <Button
                 variant="outline"

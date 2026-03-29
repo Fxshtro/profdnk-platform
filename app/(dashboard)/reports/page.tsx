@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Minus, Plus } from 'lucide-react';
 import { api, ApiError } from '@/lib/api/client';
 import { psychologistApi, type Submission } from '@/lib/api/psychologist';
 import { escapeHtml, metricsToReportRows, type ReportScoreRow } from '@/lib/report-html';
@@ -43,11 +44,27 @@ function buildScoreRows(sub: Submission | undefined): ReportScoreRow[] {
   return [];
 }
 
+interface SpecialistMailInfo {
+  fullName: string;
+  email: string;
+  phone: string;
+}
+
+function buildMailtoToClientHref(clientEmail: string, specialist: SpecialistMailInfo): string {
+  const parts: string[] = ['Profdnk', specialist.fullName, specialist.email];
+  const ph = specialist.phone.trim();
+  if (ph && ph !== '—') {
+    parts.push(ph);
+  }
+  const subject = parts.join(' — ');
+  return `mailto:${clientEmail}?${new URLSearchParams({ subject }).toString()}`;
+}
+
 export default function ReportsPage() {
   const searchParams = useSearchParams();
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<number | null>(null);
   const [customComment, setCustomComment] = useState('');
-  const [selectedPhrases, setSelectedPhrases] = useState<number[]>([]);
+  const [phrasesExpanded, setPhrasesExpanded] = useState(false);
   const [reportFormat, setReportFormat] = useState<'html' | 'txt'>('html');
 
   // Читаем resultId из URL при загрузке страницы
@@ -101,15 +118,8 @@ export default function ReportsPage() {
     [submissions, selectedSubmissionId]
   );
 
-  const handleAddPhrase = (index: number) => {
-    if (!selectedPhrases.includes(index)) {
-      setSelectedPhrases([...selectedPhrases, index]);
-      setCustomComment(prev => prev + (prev ? '\n' : '') + PREDEFINED_PHRASES[index]);
-    }
-  };
-
-  const handleRemovePhrase = (index: number) => {
-    setSelectedPhrases(selectedPhrases.filter(i => i !== index));
+  const appendPhrase = (index: number): void => {
+    setCustomComment((prev) => prev + (prev ? '\n' : '') + PREDEFINED_PHRASES[index]);
   };
 
   const handleGenerateReport = () => {
@@ -464,7 +474,7 @@ Email: ${specialist.email}
                   onClick={() => {
                     setSelectedSubmissionId(result.id);
                     setCustomComment('');
-                    setSelectedPhrases([]);
+                    setPhrasesExpanded(false);
                   }}
                 >
                   <div className="text-left">
@@ -531,18 +541,64 @@ Email: ${specialist.email}
                 {/* Заготовленные фразы */}
                 <div>
                   <Label className="mb-3 block">Заготовленные фразы (нажмите для добавления)</Label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {PREDEFINED_PHRASES.map((phrase, index) => (
+                  {!phrasesExpanded ? (
+                    <div className="space-y-2">
+                      <div className="grid gap-2 lg:grid-cols-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-auto py-3 text-sm justify-start text-left"
+                          onClick={() => appendPhrase(0)}
+                        >
+                          <span className="line-clamp-2">{PREDEFINED_PHRASES[0]}</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="hidden h-auto py-3 text-sm justify-start text-left lg:flex"
+                          onClick={() => appendPhrase(1)}
+                        >
+                          <span className="line-clamp-2">{PREDEFINED_PHRASES[1]}</span>
+                        </Button>
+                      </div>
                       <Button
-                        key={index}
-                        variant={selectedPhrases.includes(index) ? 'primary' : 'outline'}
-                        className="h-auto py-3 text-sm justify-start text-left"
-                        onClick={() => selectedPhrases.includes(index) ? handleRemovePhrase(index) : handleAddPhrase(index)}
+                        type="button"
+                        variant="outline"
+                        className="h-auto w-full gap-2 py-3 text-sm"
+                        onClick={() => setPhrasesExpanded(true)}
+                        aria-expanded={false}
                       >
-                        <span className="line-clamp-2">{phrase}</span>
+                        <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                        Показать ещё фразы
                       </Button>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {PREDEFINED_PHRASES.map((phrase, index) => (
+                          <Button
+                            key={index}
+                            type="button"
+                            variant="outline"
+                            className="h-auto py-3 text-sm justify-start text-left"
+                            onClick={() => appendPhrase(index)}
+                          >
+                            <span className="line-clamp-2">{phrase}</span>
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-auto w-full gap-2 py-3 text-sm"
+                        onClick={() => setPhrasesExpanded(false)}
+                        aria-expanded={true}
+                      >
+                        <Minus className="h-4 w-4 shrink-0" aria-hidden />
+                        Скрыть лишние фразы
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Текстовое поле */}
@@ -615,15 +671,27 @@ Email: ${specialist.email}
                 </p>
 
                 {/* Кнопки действий */}
-                <div className="flex gap-2">
-                  <Button onClick={handleGenerateReport} className="flex-1">
-                    💾 Скачать {reportFormat.toUpperCase()} отчёт
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <Button onClick={handleGenerateReport} className="w-full min-w-0 sm:flex-1">
+                    Скачать {reportFormat.toUpperCase()} отчёт
                   </Button>
-                  <Button variant="outline" onClick={() => {
-                    navigator.clipboard.writeText(customComment);
-                    alert('Текст скопирован в буфер обмена');
-                  }}>
-                    Копировать
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full shrink-0 whitespace-nowrap sm:w-auto sm:min-w-0"
+                    disabled={!selectedSubmission.client_email?.trim()}
+                    title={
+                      selectedSubmission.client_email?.trim()
+                        ? 'Открыть почтовый клиент с адресом клиента'
+                        : 'У клиента не указан email'
+                    }
+                    onClick={() => {
+                      const to = selectedSubmission.client_email?.trim();
+                      if (!to) return;
+                      window.location.href = buildMailtoToClientHref(to, specialist);
+                    }}
+                  >
+                    Почта клиенту
                   </Button>
                 </div>
               </>
