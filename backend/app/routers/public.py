@@ -7,7 +7,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Submission, Test, User
+from app.models import Role, Submission, Test, User
 from app.schemas import PublicSubmitBody
 from app.services.test_config import (
     compute_metrics,
@@ -104,9 +104,22 @@ def card(pid: int, db: Session = Depends(get_db)):
     u = db.query(User).filter(User.id == pid).first()
     if not u:
         raise HTTPException(404)
+    phone = (u.phone or "").strip() or None
+    specialization = (
+        "Администратор платформы"
+        if u.role == Role.ADMIN
+        else "Профориентолог, карьерный консультант"
+    )
     return {
+        "id": u.id,
         "full_name": u.full_name,
-        "about_html": _safe_md(u.about_md),
+        "email": u.email,
+        "phone": phone,
+        "about_md": u.about_md or "",
+        "role": u.role.value if hasattr(u.role, "value") else str(u.role),
+        "is_active": u.is_active,
+        "is_blocked": u.is_blocked,
+        "specialization": specialization,
     }
 
 

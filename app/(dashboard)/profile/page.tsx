@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Share2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +10,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { psychologistApi } from '@/lib/api/psychologist';
 import { ProfileQRCode } from '@/components/features/ProfileQRCode';
+import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [qrPanelMounted, setQrPanelMounted] = useState(false);
+  const [qrPanelActive, setQrPanelActive] = useState(false);
+  const qrPanelWasActiveRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [formData, setFormData] = useState({
     full_name: '',
@@ -75,6 +80,68 @@ export default function ProfilePage() {
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const requestCloseQrPanel = useCallback(() => {
+    setQrPanelActive(false);
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      queueMicrotask(() => setQrPanelMounted(false));
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!qrPanelMounted) return;
+    setQrPanelActive(false);
+    let innerId = 0;
+    const outerId = requestAnimationFrame(() => {
+      innerId = requestAnimationFrame(() => setQrPanelActive(true));
+    });
+    return () => {
+      cancelAnimationFrame(outerId);
+      if (innerId) cancelAnimationFrame(innerId);
+    };
+  }, [qrPanelMounted]);
+
+  const handleQrPanelTransitionEnd = useCallback(
+    (e: React.TransitionEvent<HTMLDivElement>) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.propertyName !== 'transform' && e.propertyName !== 'opacity') return;
+      if (qrPanelActive || !qrPanelMounted) return;
+      setQrPanelMounted(false);
+    },
+    [qrPanelActive, qrPanelMounted],
+  );
+
+  useEffect(() => {
+    if (!qrPanelMounted || !qrPanelActive) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') requestCloseQrPanel();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [qrPanelMounted, qrPanelActive, requestCloseQrPanel]);
+
+  useEffect(() => {
+    if (!qrPanelMounted) {
+      qrPanelWasActiveRef.current = false;
+      return;
+    }
+    if (qrPanelActive) {
+      qrPanelWasActiveRef.current = true;
+      return;
+    }
+    if (!qrPanelWasActiveRef.current) return;
+    qrPanelWasActiveRef.current = false;
+    const id = window.setTimeout(() => setQrPanelMounted(false), 400);
+    return () => clearTimeout(id);
+  }, [qrPanelMounted, qrPanelActive]);
 
   if (isLoading) {
     return (
@@ -280,13 +347,75 @@ export default function ProfilePage() {
       </Card>
 
       {profile && (
-        <div className="max-w-md">
-          <ProfileQRCode
-            profileUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard`}
-            psychologistName={profile?.full_name || 'Психолог'}
-            psychologistId={profile?.id}
-          />
-        </div>
+        <>
+          <button
+            type="button"
+            aria-label={qrPanelMounted && qrPanelActive ? 'Закрыть QR профиля' : 'Открыть QR профиля'}
+            aria-expanded={qrPanelMounted && qrPanelActive}
+            className={cn(
+              'fixed right-0 top-1/2 z-45 flex h-14 w-13 -translate-y-1/2 items-center justify-center rounded-l-full border border-r-0 border-border bg-card shadow-md transition-colors hover:bg-accent cursor-pointer',
+              qrPanelMounted && qrPanelActive && 'z-65',
+            )}
+            onClick={() => {
+              if (qrPanelMounted && qrPanelActive) {
+                requestCloseQrPanel();
+                return;
+              }
+              if (!qrPanelMounted) {
+                setQrPanelMounted(true);
+              }
+            }}
+          >
+            <Share2 className="h-5 w-5 shrink-0 text-foreground" aria-hidden />
+          </button>
+
+          {qrPanelMounted && (
+            <>
+              <button
+                type="button"
+                aria-label="Закрыть"
+                className={cn(
+                  'fixed inset-0 z-55 bg-black/60 transition-opacity duration-300 ease-out',
+                  qrPanelActive ? 'opacity-100' : 'pointer-events-none opacity-0',
+                )}
+                onClick={requestCloseQrPanel}
+              />
+              <div className="pointer-events-none fixed inset-0 z-60 max-lg:flex max-lg:items-center max-lg:justify-center max-lg:p-4">
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Ваш профиль, QR-код для быстрого доступа"
+                  onTransitionEnd={handleQrPanelTransitionEnd}
+                  className={cn(
+                    'pointer-events-auto flex max-h-[min(85vh,calc(100dvh-2rem))] flex-col items-center justify-center overflow-y-auto rounded-xl border bg-background px-4 pb-6 pt-12 shadow-xl duration-300 ease-out motion-reduce:transition-none',
+                    'max-lg:w-[min(100vw-2rem,28rem)] max-lg:transition-[transform,opacity] max-lg:will-change-[transform,opacity]',
+                    qrPanelActive ? 'max-lg:translate-y-0 max-lg:opacity-100' : 'max-lg:-translate-y-3 max-lg:opacity-0',
+                    'lg:fixed lg:right-0 lg:top-16 lg:h-[calc(100dvh-4rem)] lg:min-h-0 lg:max-w-md lg:w-full lg:rounded-l-xl lg:rounded-r-none lg:border-r-0 lg:shadow-2xl lg:transition-transform lg:will-change-transform',
+                    qrPanelActive ? 'lg:translate-x-0' : 'lg:translate-x-full',
+                  )}
+                >
+                <button
+                  type="button"
+                  aria-label="Закрыть"
+                  className="absolute right-3 top-3 z-10 rounded-sm p-1.5 text-muted-foreground opacity-80 ring-offset-background transition-opacity hover:opacity-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  onClick={requestCloseQrPanel}
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <div className="mx-auto my-auto w-full max-w-sm shrink-0">
+                  <ProfileQRCode
+                    profileUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard`}
+                    psychologistName={profile.full_name || 'Психолог'}
+                    psychologistId={profile.id}
+                  />
+                </div>
+                </div>
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   );
