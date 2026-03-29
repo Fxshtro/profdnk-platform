@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,12 @@ function getQuestionWording(test: Test | undefined, questionId: string): string 
 export default function ResultDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const surveyIdParam = searchParams.get('surveyId');
+  const resultsListHref =
+    surveyIdParam != null && surveyIdParam !== ''
+      ? `/results?surveyId=${encodeURIComponent(surveyIdParam)}`
+      : '/results';
   const [docxLoading, setDocxLoading] = useState(false);
   const resultId = Number(params.id as string);
   const { data: result, isLoading, isError } = useQuery({
@@ -78,7 +84,7 @@ export default function ResultDetailPage() {
         <Card className="w-full max-w-md">
           <CardContent className="py-8 text-center">
             <p className="text-muted-foreground">Результат не найден или недоступен</p>
-            <Button className="mt-4" onClick={() => router.push('/results')}>
+            <Button className="mt-4" onClick={() => router.push(resultsListHref)}>
               Назад к списку
             </Button>
           </CardContent>
@@ -97,7 +103,7 @@ export default function ResultDetailPage() {
             Детальная информация о прохождении
           </p>
         </div>
-        <Link href="/results">
+        <Link href={resultsListHref}>
           <Button variant="outline">Назад</Button>
         </Link>
       </div>

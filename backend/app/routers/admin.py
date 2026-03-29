@@ -65,12 +65,13 @@ def patch_psych(pid: int, payload: AdminUpdatePsychologist, db: Session = Depend
     u = db.query(User).filter(User.id == pid, User.role == Role.PSYCHOLOGIST).first()
     if not u:
         raise HTTPException(404, "Не найден")
-    if payload.is_blocked is not None:
-        u.is_blocked = payload.is_blocked
-    if payload.is_active is not None:
-        u.is_active = payload.is_active
-    if payload.access_expires_at is not None:
-        u.access_expires_at = payload.access_expires_at
+    data = payload.model_dump(exclude_unset=True)
+    if "is_blocked" in data:
+        u.is_blocked = data["is_blocked"]
+    if "is_active" in data:
+        u.is_active = data["is_active"]
+    if "access_expires_at" in data:
+        u.access_expires_at = data["access_expires_at"]
     db.commit()
     db.refresh(u)
     return u
@@ -119,7 +120,12 @@ def extend_subscription(
     if not u:
         raise HTTPException(404, "Не найден")
     now = datetime.now(timezone.utc)
-    base = u.access_expires_at if u.access_expires_at and u.access_expires_at > now else now
+    if not u.is_active:
+        base = now
+    elif u.access_expires_at and u.access_expires_at > now:
+        base = u.access_expires_at
+    else:
+        base = now
     u.access_expires_at = base + timedelta(days=payload.days)
     u.is_active = True
     u.is_blocked = False

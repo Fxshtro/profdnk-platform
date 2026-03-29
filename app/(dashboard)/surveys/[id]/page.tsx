@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { CopyClipboardButton } from '@/components/ui/copy-clipboard-button';
 import { Badge } from '@/components/ui/badge';
 import { psychologistApi } from '@/lib/api/psychologist';
 import Link from 'next/link';
@@ -240,16 +241,15 @@ export default function SurveyDetailPage() {
             <Link href={`/results?surveyId=${survey.id}`}>
               <Button variant="outline">Показать результаты</Button>
             </Link>
-            <Button
+            <CopyClipboardButton
               variant="outline"
-              onClick={() => {
-                const link = `${typeof window !== 'undefined' ? window.location.origin : ''}/client/${survey.unique_token}`;
-                navigator.clipboard.writeText(link);
-                alert('Ссылка скопирована!');
-              }}
-            >
-              Копировать ссылку
-            </Button>
+              widthPreset="link"
+              text={() =>
+                `${typeof window !== 'undefined' ? window.location.origin : ''}/client/${survey.unique_token}`
+              }
+              defaultLabel="Копировать ссылку"
+              copiedLabel="Скопировано!"
+            />
           </div>
         </CardContent>
       </Card>

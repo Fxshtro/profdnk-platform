@@ -679,24 +679,21 @@ Email: ${specialist.email}
                   <Button onClick={handleGenerateReport} className="w-full min-w-0 sm:flex-1">
                     Скачать {reportFormat.toUpperCase()} отчёт
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full shrink-0 whitespace-nowrap sm:w-auto sm:min-w-0"
-                    disabled={!selectedSubmission.client_email?.trim()}
-                    title={
-                      selectedSubmission.client_email?.trim()
-                        ? 'Открыть почтовый клиент с адресом клиента'
-                        : 'У клиента не указан email'
-                    }
-                    onClick={() => {
-                      const to = selectedSubmission.client_email?.trim();
-                      if (!to) return;
-                      window.location.href = buildMailtoToClientHref(to, specialist);
-                    }}
-                  >
-                    Почта клиенту
-                  </Button>
+                  {selectedSubmission.client_email?.trim() ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full shrink-0 whitespace-nowrap sm:w-auto sm:min-w-0"
+                      title="Открыть почтовый клиент с адресом клиента"
+                      onClick={() => {
+                        const to = selectedSubmission.client_email?.trim();
+                        if (!to) return;
+                        window.location.href = buildMailtoToClientHref(to, specialist);
+                      }}
+                    >
+                      Почта клиенту
+                    </Button>
+                  ) : null}
                 </div>
               </>
             ) : (

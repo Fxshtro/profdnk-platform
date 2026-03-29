@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { CopyClipboardButton } from '@/components/ui/copy-clipboard-button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -15,7 +16,7 @@ import Link from 'next/link';
 
 interface LinkLimit {
   token: string;
-  limit: number; // 0 = бесконечно
+  limit: number;
   used: number;
 }
 
@@ -104,12 +105,6 @@ export default function SurveysPage() {
     };
     setLinkLimits(newLimits);
     localStorage.setItem('surveyLinkLimits', JSON.stringify(newLimits));
-  };
-
-  const handleCopyLink = (surveyToken: string) => {
-    const link = `${window.location.origin}/client/${surveyToken}`;
-    navigator.clipboard.writeText(link);
-    alert('Ссылка скопирована!');
   };
 
   const getLimitStatus = (token: string) => {
@@ -225,12 +220,13 @@ export default function SurveysPage() {
                               <code className="flex-1 rounded-md bg-muted px-3 py-2 text-sm break-all">
                                 {`${typeof window !== 'undefined' ? window.location.origin : ''}/client/${survey.unique_token}`}
                               </code>
-                              <Button
+                              <CopyClipboardButton
                                 variant="outline"
-                                onClick={() => handleCopyLink(survey.unique_token)}
-                              >
-                                Копировать
-                              </Button>
+                                widthPreset="compact"
+                                text={`${typeof window !== 'undefined' ? window.location.origin : ''}/client/${survey.unique_token}`}
+                                defaultLabel="Копировать"
+                                copiedLabel="Скопировано!"
+                              />
                             </div>
 
                             <div className="space-y-3">

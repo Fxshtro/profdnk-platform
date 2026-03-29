@@ -3,7 +3,7 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { CopyClipboardButton } from '@/components/ui/copy-clipboard-button';
 
 interface ProfileQRCodeProps {
   profileUrl: string;
@@ -12,16 +12,10 @@ interface ProfileQRCodeProps {
 }
 
 export function ProfileQRCode({ profileUrl, psychologistName, psychologistId }: ProfileQRCodeProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopyLink = () => {
-    const url = psychologistId 
+  const profileLink =
+    psychologistId != null
       ? `${typeof window !== 'undefined' ? window.location.origin : ''}/p/${psychologistId}`
       : profileUrl;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleDownload = () => {
     const svg = document.getElementById('profile-qr-code');
@@ -47,10 +41,6 @@ export function ProfileQRCode({ profileUrl, psychologistName, psychologistId }: 
     }
   };
 
-  const qrValue = psychologistId 
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/p/${psychologistId}`
-    : profileUrl;
-
   return (
     <Card>
       <CardHeader className="text-center">
@@ -64,7 +54,7 @@ export function ProfileQRCode({ profileUrl, psychologistName, psychologistId }: 
           <div className="rounded-lg border bg-white p-4">
             <QRCodeSVG
               id="profile-qr-code"
-              value={qrValue}
+              value={profileLink}
               size={200}
               level="H"
               includeMargin={true}
@@ -77,19 +67,20 @@ export function ProfileQRCode({ profileUrl, psychologistName, psychologistId }: 
             {psychologistName}
           </p>
           <p className="text-xs text-center text-muted-foreground break-all">
-            {qrValue}
+            {profileLink}
           </p>
         </div>
         
         <div className="flex gap-2">
-          <Button
+          <CopyClipboardButton
             variant="outline"
             size="sm"
             className="flex-1"
-            onClick={handleCopyLink}
-          >
-            {copied ? 'Скопировано!' : 'Копировать ссылку'}
-          </Button>
+            widthPreset="none"
+            text={profileLink}
+            defaultLabel="Копировать ссылку"
+            copiedLabel="Скопировано!"
+          />
           <Button
             variant="outline"
             size="sm"

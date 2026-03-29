@@ -26,11 +26,6 @@ export default function AdminSubscriptionsPage() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin-subscriptions'] });
 
-  const activateMutation = useMutation({
-    mutationFn: (id: number) => psychologistApi.activatePsychologist(id),
-    onSuccess: refresh,
-  });
-
   const extendMutation = useMutation({
     mutationFn: ({ id, days }: { id: number; days: number }) => psychologistApi.extendSubscription(id, days),
     onSuccess: () => {
@@ -39,13 +34,9 @@ export default function AdminSubscriptionsPage() {
     },
   });
 
-  const cancelMutation = useMutation({
-    mutationFn: (id: number) => psychologistApi.updatePsychologist(id, { is_active: false }),
-    onSuccess: refresh,
-  });
-
   const resetMutation = useMutation({
-    mutationFn: (id: number) => psychologistApi.updatePsychologist(id, { is_active: false }),
+    mutationFn: (id: number) =>
+      psychologistApi.updatePsychologist(id, { is_active: false, access_expires_at: null }),
     onSuccess: () => {
       refresh();
       setShowResetDialog(false);
@@ -53,14 +44,10 @@ export default function AdminSubscriptionsPage() {
     },
   });
 
-  const handleExtend = () => {
+  const applyDaysFromDialog = (): void => {
     if (!selectedPsychologist) return;
     const days = Math.max(1, parseInt(extendDays, 10) || 30);
     extendMutation.mutate({ id: selectedPsychologist.id, days });
-  };
-
-  const handleCancel = (id: number) => {
-    cancelMutation.mutate(id);
   };
 
   const handleReset = (id: number) => {
@@ -254,17 +241,16 @@ export default function AdminSubscriptionsPage() {
               Отмена
             </Button>
             <Button
+              disabled={extendMutation.isPending}
               onClick={() => {
-                if (!selectedPsychologist) return;
-                if (selectedPsychologist.is_active) {
-                  handleExtend();
-                } else {
-                  activateMutation.mutate(selectedPsychologist.id);
-                  setShowExtendDialog(false);
-                }
+                applyDaysFromDialog();
               }}
             >
-              {selectedPsychologist?.is_active ? 'Продлить' : 'Активировать'}
+              {extendMutation.isPending
+                ? 'Сохранение...'
+                : selectedPsychologist?.is_active
+                  ? 'Продлить'
+                  : 'Активировать'}
             </Button>
           </DialogFooter>
         </DialogContent>
