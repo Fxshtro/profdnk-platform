@@ -50,6 +50,6 @@ class AdminExtendSubscription(BaseModel):
 
 class PublicSubmitBody(BaseModel):
     client_name: str = Field(min_length=1)
-    client_email: EmailStr
+    client_email: str | None = None
     client_phone: str | None = None
     answers: dict = Field(default_factory=dict)

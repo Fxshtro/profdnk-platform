@@ -65,7 +65,8 @@ def submit_test(token: str, body: PublicSubmitBody, db: Session = Depends(get_db
     if not t:
         raise HTTPException(404, "Тест не найден")
     cfg = get_test_config(t)
-    errs = validate_client_fields(body.client_name, body.client_email)
+    client_email = (body.client_email or "").strip()
+    errs = validate_client_fields(cfg, body.client_name, client_email, body.client_phone)
     if body.client_phone is not None and len(body.client_phone) > 64:
         errs.append("Телефон слишком длинный")
     ans = body.answers if isinstance(body.answers, dict) else {}
@@ -76,7 +77,7 @@ def submit_test(token: str, body: PublicSubmitBody, db: Session = Depends(get_db
     metrics = compute_metrics(cfg, ans)
     sub = Submission(
         test_id=t.id,
-        client_email=body.client_email.strip(),
+        client_email=client_email,
         client_name=body.client_name.strip(),
         client_phone=(body.client_phone or "").strip() or None,
         answers=ans,

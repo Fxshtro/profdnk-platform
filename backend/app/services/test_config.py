@@ -26,26 +26,54 @@ QUESTION_TYPES = frozenset(
 
 
 def get_test_config(test: Any) -> dict[str, Any]:
-    """Возвращает нормализованный config (с секциями)."""
+    """Возвращает нормализованный config (с секциями).
+
+    Конструктор сохраняет config_json с плоским ``questions`` и ``client_data`` без ``sections``;
+    эти поля нужно сохранять в ответе API, иначе клиентская форма всегда видит дефолтные флаги.
+    """
     raw = getattr(test, "config_json", None)
     if raw and isinstance(raw, dict) and raw.get("sections"):
         cfg = dict(raw)
         cfg.setdefault("formulas", [])
         return cfg
-    questions = list(getattr(test, "questions", None) or [])
-    if questions and isinstance(questions[0], dict) and questions[0].get("section_id"):
-        return {"version": 2, "sections": _sections_from_flat(questions), "formulas": []}
-    return {
-        "version": 2,
-        "sections": [
-            {
-                "id": "main",
-                "title": "Вопросы",
-                "questions": [_normalize_question(q) for q in questions],
-            }
-        ],
-        "formulas": [],
-    }
+
+    formulas: list[Any] = []
+    questions_source: list[Any] = []
+    if raw and isinstance(raw, dict):
+        if isinstance(raw.get("formulas"), list):
+            formulas = list(raw["formulas"])
+        if isinstance(raw.get("questions"), list):
+            questions_source = list(raw["questions"])
+
+    if not questions_source:
+        questions_source = list(getattr(test, "questions", None) or [])
+
+    if questions_source and isinstance(questions_source[0], dict) and questions_source[0].get("section_id"):
+        cfg = {"version": 2, "sections": _sections_from_flat(questions_source), "formulas": formulas}
+    else:
+        cfg = {
+            "version": 2,
+            "sections": [
+                {
+                    "id": "main",
+                    "title": "Вопросы",
+                    "questions": [_normalize_question(q) for q in questions_source if isinstance(q, dict)],
+                }
+            ],
+            "formulas": formulas,
+        }
+
+    if raw and isinstance(raw, dict):
+        if isinstance(raw.get("client_data"), dict):
+            cfg["client_data"] = dict(raw["client_data"])
+        elif isinstance(raw.get("clientDataConfig"), dict):
+            cfg["client_data"] = dict(raw["clientDataConfig"])
+        if isinstance(raw.get("metrics"), list):
+            cfg["metrics"] = raw["metrics"]
+        if isinstance(raw.get("reportTemplates"), list):
+            cfg["reportTemplates"] = raw["reportTemplates"]
+
+    return cfg
 
 
 def _sections_from_flat(questions: list[dict]) -> list[dict]:
@@ -247,12 +275,42 @@ def compute_metrics(config: dict, answers: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def validate_client_fields(name: str, email: str) -> list[str]:
+def _client_data_flags(config: dict[str, Any]) -> tuple[bool, bool]:
+    cd = config.get("client_data") or config.get("clientDataConfig") or {}
+    if not isinstance(cd, dict):
+        return True, False
+    require_email = bool(cd.get("requireEmail", True))
+    require_phone = bool(cd.get("requirePhone", False))
+    return require_email, require_phone
+
+
+_PHONE_OK = re.compile(r"^[\d\s\-+()]+$")
+
+
+def validate_client_fields(
+    config: dict[str, Any],
+    name: str,
+    email: str,
+    phone: str | None,
+) -> list[str]:
     errs: list[str] = []
     if not (name or "").strip():
         errs.append("Укажите имя")
-    if not (email or "").strip() or "@" not in email:
+    require_email, require_phone = _client_data_flags(config)
+    em = (email or "").strip()
+    if require_email:
+        if not em or "@" not in em:
+            errs.append("Укажите корректный email")
+    elif em and "@" not in em:
         errs.append("Укажите корректный email")
+    ph = (phone or "").strip()
+    if require_phone:
+        if not ph:
+            errs.append("Укажите телефон")
+        elif not _PHONE_OK.match(ph):
+            errs.append("Некорректный формат телефона")
+    elif ph and not _PHONE_OK.match(ph):
+        errs.append("Некорректный формат телефона")
     return errs
 
 

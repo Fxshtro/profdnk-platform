@@ -166,7 +166,13 @@ export default function ClientSurveyPage() {
       }
     }
 
-    if (clientDataConfig.requirePhone && clientData.phone && !/^[\d\s\-\+\(\)]+$/.test(clientData.phone)) {
+    if (clientDataConfig.requirePhone) {
+      if (!clientData.phone.trim()) {
+        newErrors.phone = 'Введите номер телефона';
+      } else if (!/^[\d\s\-\+\(\)]+$/.test(clientData.phone)) {
+        newErrors.phone = 'Введите корректный номер телефона';
+      }
+    } else if (clientData.phone.trim() && !/^[\d\s\-\+\(\)]+$/.test(clientData.phone)) {
       newErrors.phone = 'Введите корректный номер телефона';
     }
 

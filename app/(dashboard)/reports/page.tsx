@@ -133,9 +133,13 @@ export default function ReportsPage() {
     const surveyTitle = escapeHtml(sub.test?.title || `Тест #${sub.test_id}`);
     const clientName = escapeHtml(sub.client_name || 'Не указано');
     const clientEmail = escapeHtml(sub.client_email || 'Не указано');
-    const clientPhone = escapeHtml(sub.client_phone?.trim() || 'Не указано');
+    const clientPhone = sub.client_phone?.trim();
     const completedAt = new Date(sub.created_at).toLocaleDateString('ru-RU');
     const commentBlock = escapeHtml(customComment || 'Текст отчёта не добавлен');
+
+    const clientPhoneHtml = clientPhone
+      ? `<p><strong>Телефон</strong>${escapeHtml(clientPhone)}</p>`
+      : '';
 
     if (reportFormat === 'html') {
       const metricsSection =
@@ -332,8 +336,7 @@ export default function ReportsPage() {
           <div class="section-title">Информация о клиенте</div>
           <div class="panel">
             <p><strong>ФИО</strong>${clientName}</p>
-            <p><strong>Email</strong>${clientEmail}</p>
-            <p><strong>Телефон</strong>${clientPhone}</p>
+            <p><strong>Email</strong>${clientEmail}</p>${clientPhoneHtml}
             <p><strong>Дата прохождения</strong>${completedAt}</p>
           </div>
         </div>
@@ -398,13 +401,13 @@ export default function ReportsPage() {
             scoreRows.map((r) => `${r.metricName}: ${r.value}`).join('\n') +
             '\n'
           : '';
+      const phoneLine = clientPhone ? `\nТелефон: ${clientPhone}` : '';
       const reportContent = `
 КЛИЕНТСКИЙ ОТЧЁТ
 =================
 Тест: ${sub.test?.title || `ID ${sub.test_id}`}
 Клиент: ${sub.client_name}
-Email: ${sub.client_email}
-Телефон: ${sub.client_phone || '—'}
+Email: ${sub.client_email}${phoneLine}
 Дата: ${completedAt}
 ${metricsTxt}
 ---

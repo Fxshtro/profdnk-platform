@@ -123,8 +123,8 @@ export default function HomePage() {
 
       {/* Header */}
       <header
-        className={`sticky top-0 z-50 w-full border-b transition-all duration-300 px-5 ${
-          scrolled ? 'bg-background/95 backdrop-blur shadow-lg' : 'bg-transparent'
+        className={`sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur transition-all duration-300 px-5 ${
+          scrolled ? 'shadow-lg' : ''
         }`}
       >
         <div className="container2 flex h-14 items-center justify-between">
