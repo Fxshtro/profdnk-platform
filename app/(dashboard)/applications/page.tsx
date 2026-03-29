@@ -5,6 +5,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import CreatePsychologistDialog, {
+  type CreatePsychologistPrefill,
+} from '@/components/features/admin/create-psychologist-dialog';
 import { applicationsApi } from '@/lib/api/applications';
 import type { Application } from '@/lib/users';
 import {
@@ -21,9 +24,21 @@ interface ApplicationWithViewed extends Application {
   viewed?: boolean;
 }
 
+function applicationToPrefill(app: Application): CreatePsychologistPrefill {
+  const ext = app as Application & { full_name?: string };
+  return {
+    full_name: ext.fullName ?? ext.full_name ?? '',
+    email: ext.email,
+    phone: ext.phone ?? '',
+    specialization: ext.specialization ?? '',
+  };
+}
+
 export default function ApplicationsPage() {
   const queryClient = useQueryClient();
   const [selectedApplication, setSelectedApplication] = useState<ApplicationWithViewed | null>(null);
+  const [showCreatePsychologist, setShowCreatePsychologist] = useState(false);
+  const [createPrefill, setCreatePrefill] = useState<CreatePsychologistPrefill | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
     applicationId: number | null;
@@ -204,16 +219,6 @@ export default function ApplicationsPage() {
                 Архив обработанных заявок ({reviewedApplications.length})
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                localStorage.removeItem('applications');
-                queryClient.invalidateQueries({ queryKey: ['applications'] });
-              }}
-            >
-              Очистить всё
-            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -309,6 +314,14 @@ export default function ApplicationsPage() {
                   <p className="text-sm text-muted-foreground">{selectedApplication.fullName}</p>
                 </div>
                 <div className="grid gap-1">
+                  <span className="text-sm font-medium">Email:</span>
+                  <p className="text-sm text-muted-foreground">{selectedApplication.email}</p>
+                </div>
+                <div className="grid gap-1">
+                  <span className="text-sm font-medium">Телефон:</span>
+                  <p className="text-sm text-muted-foreground">{selectedApplication.phone || '—'}</p>
+                </div>
+                <div className="grid gap-1">
                   <span className="text-sm font-medium">Специализация:</span>
                   <p className="text-sm text-muted-foreground">{selectedApplication.specialization}</p>
                 </div>
@@ -342,17 +355,45 @@ export default function ApplicationsPage() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <a href={`mailto:${selectedApplication.email}`}>
-                <Button variant="outline" className="gap-2">
-                  <Mail className="h-4 w-4" />
-                  {selectedApplication.email}
+            <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-stretch">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setCreatePrefill(applicationToPrefill(selectedApplication));
+                    setShowCreatePsychologist(true);
+                    setSelectedApplication(null);
+                  }}
+                >
+                  Быстро создать аккаунт
                 </Button>
-              </a>
+                <a href={`mailto:${selectedApplication.email}`} className="inline-flex">
+                  <Button variant="outline" type="button" className="gap-2">
+                    <Mail className="h-4 w-4" />
+                    Написать на почту
+                  </Button>
+                </a>
+              </div>
+              <Button type="button" variant="secondary" onClick={() => setSelectedApplication(null)}>
+                Закрыть
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
+
+      <CreatePsychologistDialog
+        open={showCreatePsychologist}
+        onOpenChange={(open) => {
+          setShowCreatePsychologist(open);
+          if (!open) setCreatePrefill(null);
+        }}
+        initial={createPrefill}
+        onCreated={() => {
+          void queryClient.invalidateQueries({ queryKey: ['applications'] });
+          void queryClient.invalidateQueries({ queryKey: ['admin-psychologists'] });
+        }}
+      />
 
       {/* Диалог подтверждения удаления */}
       <Dialog

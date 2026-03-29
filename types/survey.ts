@@ -35,7 +35,6 @@ export interface Question {
   max?: number;
   step?: number;
   defaultScore?: number;
-  metricValues?: Record<string, number>;
 }
 
 export interface Formula {

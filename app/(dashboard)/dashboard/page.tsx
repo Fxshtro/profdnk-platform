@@ -153,7 +153,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <SubscriptionGuard mode="block">
-              <Link href="/builder">
+              <Link href="/builder?new=1">
                 <Button className="w-full">Создать</Button>
               </Link>
             </SubscriptionGuard>

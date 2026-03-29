@@ -32,6 +32,7 @@ interface MeProfile {
   email: string;
   phone: string | null;
   role: string;
+  specialization?: string;
 }
 
 function buildScoreRows(sub: Submission | undefined): ReportScoreRow[] {
@@ -109,7 +110,7 @@ export default function ReportsPage() {
       specialization:
         me.role === 'admin'
           ? 'Администратор платформы'
-          : 'Профориентолог, карьерный консультант',
+          : me.specialization?.trim() || 'Профориентолог, карьерный консультант',
     };
   }, [me]);
 

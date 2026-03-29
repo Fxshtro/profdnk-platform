@@ -7,8 +7,8 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Role, Submission, Test, User
-from app.schemas import PublicSubmitBody
+from app.models import PsychologistRegistrationApplication, Role, Submission, Test, User
+from app.schemas import PsychologistRegistrationCreate, PsychologistRegistrationOut, PublicSubmitBody
 from app.services.test_config import (
     compute_metrics,
     get_test_config,
@@ -105,11 +105,11 @@ def card(pid: int, db: Session = Depends(get_db)):
     if not u:
         raise HTTPException(404)
     phone = (u.phone or "").strip() or None
-    specialization = (
-        "Администратор платформы"
-        if u.role == Role.ADMIN
-        else "Профориентолог, карьерный консультант"
-    )
+    if u.role == Role.ADMIN:
+        specialization = "Администратор платформы"
+    else:
+        spec = (u.specialization or "").strip()
+        specialization = spec or "Профориентолог, карьерный консультант"
     return {
         "id": u.id,
         "full_name": u.full_name,
@@ -129,3 +129,27 @@ def photo(pid: int, db: Session = Depends(get_db)):
     if not u or not u.photo_bytes:
         raise HTTPException(404)
     return Response(content=u.photo_bytes, media_type=u.photo_mime_type or "image/jpeg")
+
+
+@router.post(
+    "/psychologist-registration",
+    response_model=PsychologistRegistrationOut,
+    status_code=201,
+)
+def submit_psychologist_registration(
+    payload: PsychologistRegistrationCreate,
+    db: Session = Depends(get_db),
+):
+    row = PsychologistRegistrationApplication(
+        full_name=payload.full_name.strip(),
+        email=str(payload.email).strip().lower(),
+        phone=(payload.phone or "").strip() or None,
+        specialization=(payload.specialization or "").strip(),
+        education=(payload.education or "").strip(),
+        experience=(payload.experience or "").strip(),
+        comment=(payload.comment or "").strip(),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row

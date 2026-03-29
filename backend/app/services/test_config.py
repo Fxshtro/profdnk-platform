@@ -91,6 +91,34 @@ def _sections_from_flat(questions: list[dict]) -> list[dict]:
     ]
 
 
+def _options_metrics_from_raw(opts_src: list[Any]) -> list[dict[str, Any]]:
+    om: list[dict[str, Any]] = []
+    for item in opts_src:
+        if not isinstance(item, dict):
+            continue
+        ma_raw = item.get("metricAssignments")
+        if not isinstance(ma_raw, list) or not ma_raw:
+            continue
+        val = str(item.get("value", "")).strip()
+        if not val:
+            continue
+        clean_ma: list[dict[str, Any]] = []
+        for a in ma_raw:
+            if not isinstance(a, dict):
+                continue
+            mid = a.get("metricId")
+            if mid is None:
+                continue
+            try:
+                pts = float(a.get("points", 0))
+            except (TypeError, ValueError):
+                pts = 0.0
+            clean_ma.append({"metricId": str(mid), "points": pts})
+        if clean_ma:
+            om.append({"value": val, "metricAssignments": clean_ma})
+    return om
+
+
 def _normalize_option_values(raw: list[Any] | None) -> list[str]:
     """Варианты из конструктора: строки или { \"value\": \"...\", \"score\": n } — для валидации нужен список строк."""
     out: list[str] = []
@@ -125,7 +153,11 @@ def _normalize_question(q: dict) -> dict:
         "required": bool(q.get("required", False)),
     }
     if t in ("single", "multi"):
-        out["options"] = _normalize_option_values(list(q.get("options") or []))
+        opts_src = list(q.get("options") or [])
+        out["options"] = _normalize_option_values(opts_src)
+        om = _options_metrics_from_raw(opts_src)
+        if om:
+            out["options_metrics"] = om
     if t == "number":
         out["min"] = q.get("min")
         out["max"] = q.get("max")
@@ -232,10 +264,109 @@ def answer_to_scalar(q: dict, value: Any) -> float | int:
     return 0.0
 
 
+def _collect_metric_id_names(config: dict) -> dict[str, str]:
+    """id метрики → отображаемое имя (из config.metrics и с вопросов)."""
+    id_to_name: dict[str, str] = {}
+    defs = config.get("metrics")
+    if isinstance(defs, list):
+        for m in defs:
+            if isinstance(m, dict) and m.get("id"):
+                mid = str(m["id"])
+                id_to_name[mid] = str(m.get("name") or mid)
+    for q in iter_questions(config):
+        for opt in q.get("options_metrics") or []:
+            if not isinstance(opt, dict):
+                continue
+            for a in opt.get("metricAssignments") or []:
+                if not isinstance(a, dict):
+                    continue
+                mid = a.get("metricId")
+                if mid is None:
+                    continue
+                sm = str(mid)
+                if sm not in id_to_name:
+                    id_to_name[sm] = f"Метрика {sm}"
+    return id_to_name
+
+
+def _compute_builder_metrics(config: dict, answers: dict[str, Any]) -> dict[str, Any]:
+    """Баллы метрик из конструктора: варианты с metricAssignments (single/multi)."""
+    id_to_name = _collect_metric_id_names(config)
+    if not id_to_name:
+        return {}
+    scores: dict[str, float] = {mid: 0.0 for mid in id_to_name}
+
+    for q in iter_questions(config):
+        t = q["type"]
+        qid = q["id"]
+        val = answers.get(qid)
+        if val is None or val == "":
+            continue
+        if val == [] and t != "multi":
+            continue
+
+        if t == "single":
+            opts_m = q.get("options_metrics") or []
+            if not opts_m:
+                continue
+            try:
+                v_str = str(val).strip()
+            except Exception:
+                continue
+            for opt in opts_m:
+                if not isinstance(opt, dict):
+                    continue
+                if str(opt.get("value", "")).strip() != v_str:
+                    continue
+                for a in opt.get("metricAssignments") or []:
+                    if not isinstance(a, dict):
+                        continue
+                    mid = str(a.get("metricId", ""))
+                    if mid not in scores:
+                        continue
+                    try:
+                        pts = float(a.get("points", 0))
+                        scores[mid] += pts
+                    except (TypeError, ValueError):
+                        pass
+                break
+
+        elif t == "multi":
+            opts_m = q.get("options_metrics") or []
+            if not opts_m:
+                continue
+            if not isinstance(val, list):
+                continue
+            chosen = {str(x).strip() for x in val}
+            for opt in opts_m:
+                if not isinstance(opt, dict):
+                    continue
+                ov = str(opt.get("value", "")).strip()
+                if ov not in chosen:
+                    continue
+                for a in opt.get("metricAssignments") or []:
+                    if not isinstance(a, dict):
+                        continue
+                    mid = str(a.get("metricId", ""))
+                    if mid not in scores:
+                        continue
+                    try:
+                        pts = float(a.get("points", 0))
+                        scores[mid] += pts
+                    except (TypeError, ValueError):
+                        pass
+
+    out: dict[str, Any] = {}
+    for mid, name in id_to_name.items():
+        out[mid] = {"name": name, "value": float(scores.get(mid, 0.0))}
+    return out
+
+
 def compute_metrics(config: dict, answers: dict[str, Any]) -> dict[str, Any]:
     """
     answers: question_id -> value (типы по вопросу).
-    Возвращает { formula_id: { "name": str, "value": number } }
+    Формулы: { formula_id: { "name": str, "value": number } }.
+    Плюс метрики конструктора: { metric_id: { "name", "value" } }.
     """
     names: dict[str, Any] = {}
     for q in iter_questions(config):
@@ -272,6 +403,7 @@ def compute_metrics(config: dict, answers: dict[str, Any]) -> dict[str, Any]:
         except Exception:
             v = 0.0
         out[fid] = {"name": fname, "value": float(v)}
+    out.update(_compute_builder_metrics(config, answers))
     return out
 
 

@@ -12,6 +12,12 @@ class Role(str, Enum):
     PSYCHOLOGIST = "psychologist"
 
 
+class ApplicationStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 def utcnow():
     return datetime.now(timezone.utc)
 
@@ -29,6 +35,7 @@ class User(Base):
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False)
     access_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     about_md: Mapped[str] = mapped_column(Text, default="")
+    specialization: Mapped[str] = mapped_column(Text, default="")
     photo_bytes: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     photo_mime_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -68,3 +75,27 @@ class Submission(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     test: Mapped["Test"] = relationship("Test", back_populates="submissions")
+
+
+class PsychologistRegistrationApplication(Base):
+    __tablename__ = "psychologist_registration_applications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    specialization: Mapped[str] = mapped_column(Text, default="")
+    education: Mapped[str] = mapped_column(Text, default="")
+    experience: Mapped[str] = mapped_column(Text, default="")
+    comment: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[ApplicationStatus] = mapped_column(
+        SqlEnum(
+            ApplicationStatus,
+            values_callable=lambda obj: [e.value for e in obj],
+            native_enum=False,
+        ),
+        default=ApplicationStatus.PENDING,
+        index=True,
+    )
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

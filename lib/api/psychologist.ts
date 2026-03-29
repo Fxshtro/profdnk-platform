@@ -7,6 +7,7 @@ export interface PsychologistCreatePayload {
   password: string;
   phone?: string;
   access_expires_at?: string;
+  specialization?: string;
 }
 
 export interface Psychologist {
@@ -40,6 +41,7 @@ export interface ProfileUpdatePayload {
   full_name?: string;
   phone?: string;
   about_md?: string;
+  specialization?: string;
 }
 
 export interface Test {

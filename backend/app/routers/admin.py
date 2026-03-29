@@ -4,8 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Role, User
-from app.schemas import AdminCreateAdmin, AdminCreatePsychologist, AdminExtendSubscription, AdminUpdatePsychologist, UserOut
+from app.models import ApplicationStatus, PsychologistRegistrationApplication, Role, User
+from app.schemas import (
+    AdminCreateAdmin,
+    AdminCreatePsychologist,
+    AdminExtendSubscription,
+    AdminUpdatePsychologist,
+    PsychologistRegistrationOut,
+    UserOut,
+)
 from app.security import get_password_hash, require_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -45,6 +52,7 @@ def create_psych(payload: AdminCreatePsychologist, db: Session = Depends(get_db)
         hashed_password=get_password_hash(payload.password),
         role=Role.PSYCHOLOGIST,
         access_expires_at=payload.access_expires_at,
+        specialization=(payload.specialization or "").strip(),
     )
     db.add(u)
     db.commit()
@@ -118,3 +126,46 @@ def extend_subscription(
     db.commit()
     db.refresh(u)
     return u
+
+
+@router.get("/applications/list", response_model=list[PsychologistRegistrationOut])
+def list_registration_applications(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    return (
+        db.query(PsychologistRegistrationApplication)
+        .order_by(PsychologistRegistrationApplication.submitted_at.desc())
+        .all()
+    )
+
+
+@router.post("/applications/{app_id}/approve", response_model=PsychologistRegistrationOut)
+def approve_registration_application(
+    app_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = db.query(PsychologistRegistrationApplication).filter(PsychologistRegistrationApplication.id == app_id).first()
+    if not row:
+        raise HTTPException(404, "Заявка не найдена")
+    now = datetime.now(timezone.utc)
+    row.status = ApplicationStatus.APPROVED
+    row.reviewed_at = now
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.post("/applications/{app_id}/reject", response_model=PsychologistRegistrationOut)
+def reject_registration_application(
+    app_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = db.query(PsychologistRegistrationApplication).filter(PsychologistRegistrationApplication.id == app_id).first()
+    if not row:
+        raise HTTPException(404, "Заявка не найдена")
+    now = datetime.now(timezone.utc)
+    row.status = ApplicationStatus.REJECTED
+    row.reviewed_at = now
+    db.commit()
+    db.refresh(row)
+    return row

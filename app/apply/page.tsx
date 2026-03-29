@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { saveApplication, type Application } from '@/lib/users';
+import { applicationsApi } from '@/lib/api/applications';
+import { ApiError } from '@/lib/api/client';
+import { filterPhoneDigits } from '@/lib/phone-digits';
 
 export default function ApplyPage() {
   const [formData, setFormData] = useState({
@@ -20,29 +23,33 @@ export default function ApplyPage() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Создаём заявку
-    const application: Application = {
-      id: `app-${Date.now()}`,
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      specialization: formData.specialization,
-      education: formData.education,
-      experience: formData.experience,
-      comment: formData.comment,
-      status: 'pending',
-      submittedAt: new Date().toISOString(),
-    };
-    
-    // Сохраняем в localStorage
-    saveApplication(application);
-    console.log('Application submitted:', application);
-    
-    setSubmitted(true);
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      await applicationsApi.submitApplication({
+        full_name: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || undefined,
+        specialization: formData.specialization.trim(),
+        education: formData.education.trim(),
+        experience: formData.experience.trim(),
+        comment: formData.comment.trim(),
+      });
+      setSubmitted(true);
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : 'Не удалось отправить заявку. Попробуйте позже.';
+      setSubmitError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -87,6 +94,15 @@ export default function ApplyPage() {
     <div className="flex min-h-screen items-center justify-center p-4 bg-muted/30">
       <Card className="w-full max-w-2xl">
         <CardHeader>
+          <div className="mb-2 flex items-center gap-2">
+            <Link href="/login">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" type="button" aria-label="Ко входу">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </Button>
+            </Link>
+          </div>
           <CardTitle className="text-2xl">Подать заявку на регистрацию</CardTitle>
           <CardDescription>
             Заполните форму для получения доступа к платформе ПрофДНК
@@ -124,9 +140,12 @@ export default function ApplyPage() {
                 <Input
                   id="phone"
                   type="tel"
+                  inputMode="numeric"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+7 (999) 000-00-00"
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: filterPhoneDigits(e.target.value) })
+                  }
+                  placeholder="79990001122"
                 />
               </div>
               <div className="space-y-2">
@@ -181,8 +200,14 @@ export default function ApplyPage() {
               </p>
             </div>
 
-            <Button type="submit" className="w-full">
-              Отправить заявку
+            {submitError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {submitError}
+              </p>
+            ) : null}
+
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? 'Отправка…' : 'Отправить заявку'}
             </Button>
           </form>
         </CardContent>

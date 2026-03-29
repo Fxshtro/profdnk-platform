@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, type ChangeEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type ChangeEvent } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -48,6 +48,23 @@ const QUESTION_TYPES_SET = new Set<QuestionType>([
   'date',
 ]);
 
+function parseMetricAssignments(raw: unknown): MetricAssignment[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: MetricAssignment[] = [];
+  raw.forEach((item) => {
+    if (!item || typeof item !== 'object') return;
+    const a = item as Record<string, unknown>;
+    const metricId = typeof a.metricId === 'string' ? a.metricId : '';
+    const pr = a.points;
+    const points =
+      typeof pr === 'number' ? pr : typeof pr === 'string' ? parseInt(pr, 10) : NaN;
+    if (metricId && Number.isFinite(points)) {
+      out.push({ metricId, points });
+    }
+  });
+  return out.length > 0 ? out : undefined;
+}
+
 function normalizeImportedQuestions(raw: unknown): Question[] {
   if (!Array.isArray(raw)) {
     throw new Error('В JSON должен быть массив «questions»');
@@ -77,11 +94,13 @@ function normalizeImportedQuestions(raw: unknown): Question[] {
     if (Array.isArray(o.options)) {
       q.options = o.options.map((opt) => {
         if (typeof opt === 'object' && opt && 'value' in opt) {
-          const x = opt as { value?: unknown; score?: unknown };
-          return {
+          const x = opt as { value?: unknown; score?: unknown; metricAssignments?: unknown };
+          const base = {
             value: String(x.value ?? ''),
             score: typeof x.score === 'number' ? x.score : 0,
           };
+          const ma = parseMetricAssignments(x.metricAssignments);
+          return ma ? { ...base, metricAssignments: ma } : base;
         }
         return { value: String(opt), score: 0 };
       });
@@ -100,6 +119,7 @@ function parseBuilderImportJson(text: string): {
   questions: Question[];
   clientDataConfig: ClientDataConfig;
   builderDraftMeta?: BuilderDraftMeta;
+  metrics?: Metric[];
 } {
   let data: unknown;
   try {
@@ -115,6 +135,11 @@ function parseBuilderImportJson(text: string): {
     root.config_json && typeof root.config_json === 'object'
       ? (root.config_json as Record<string, unknown>)
       : null;
+
+  const metricsRaw = root.metrics ?? nested?.metrics;
+  const metricsParsed = Array.isArray(metricsRaw)
+    ? (metricsRaw as Metric[])
+    : undefined;
 
   const questionsRaw = root.questions ?? nested?.questions;
   const questions = normalizeImportedQuestions(questionsRaw);
@@ -147,7 +172,7 @@ function parseBuilderImportJson(text: string): {
     }
   }
 
-  return { questions, clientDataConfig, builderDraftMeta };
+  return { questions, clientDataConfig, builderDraftMeta, metrics: metricsParsed };
 }
 
 interface DragItem {
@@ -167,6 +192,7 @@ export default function BuilderPage() {
   const copyFromRaw = searchParams.get('copyFrom');
   const copyFromId = copyFromRaw ? Number(copyFromRaw) : NaN;
   const hasCopyFrom = Number.isFinite(copyFromId) && copyFromId > 0 && !canEditExisting;
+  const isFreshStart = searchParams.get('new') === '1';
   const [isHydrated, setIsHydrated] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
 
@@ -202,9 +228,24 @@ export default function BuilderPage() {
     setIsHydrated(true);
   }, []);
 
+  useEffect(() => {
+    if (!isHydrated) return;
+    if (!isFreshStart) return;
+    setQuestions([]);
+    setExpandedQuestions(new Set());
+    setClientDataConfig(DEFAULT_CLIENT_DATA_CONFIG);
+    setMetrics([]);
+    setTestSettings({ title: 'Новый тест', description: '' });
+    setSelectedQuestionId(null);
+    localStorage.removeItem(STORAGE_KEY);
+    skipLocalStorageLoadOnceRef.current = true;
+    router.replace('/builder');
+  }, [isHydrated, isFreshStart, router]);
+
   // Загружаем схему только после маунта, чтобы избежать SSR hydration mismatch (не трогаем черновик при редактировании / копировании)
   useEffect(() => {
     if (!isHydrated) return;
+    if (isFreshStart) return;
     if (canEditExisting) return;
     if (hasCopyFrom) return;
     if (skipLocalStorageLoadOnceRef.current) {
@@ -222,9 +263,7 @@ export default function BuilderPage() {
       if (schema.clientDataConfig) {
         setClientDataConfig(schema.clientDataConfig);
       }
-      if (Array.isArray(schema.metrics)) {
-        setMetrics(schema.metrics);
-      }
+      setMetrics(Array.isArray(schema.metrics) ? schema.metrics : []);
       if (schema.builderDraftMeta) {
         const m = schema.builderDraftMeta;
         setTestSettings({
@@ -235,7 +274,7 @@ export default function BuilderPage() {
     } catch (e) {
       console.error('Failed to load saved schema:', e);
     }
-  }, [isHydrated, canEditExisting, hasCopyFrom]);
+  }, [isHydrated, isFreshStart, canEditExisting, hasCopyFrom]);
 
   useEffect(() => {
     if (!isHydrated || !canEditExisting) return;
@@ -257,9 +296,7 @@ export default function BuilderPage() {
       if (cfg.client_data) {
         setClientDataConfig({ ...DEFAULT_CLIENT_DATA_CONFIG, ...cfg.client_data });
       }
-      if (Array.isArray(cfg.metrics)) {
-        setMetrics(cfg.metrics);
-      }
+      setMetrics(Array.isArray(cfg.metrics) ? cfg.metrics : []);
       setTestSettings(prev => ({
         ...prev,
         title: test.title || prev.title,
@@ -281,6 +318,7 @@ export default function BuilderPage() {
         const cfg = (test.config_json || {}) as Record<string, unknown> & {
           questions?: Question[];
           client_data?: Partial<ClientDataConfig>;
+          metrics?: Metric[];
         };
         let qs: Question[] = [];
         if (Array.isArray(cfg.questions)) {
@@ -296,11 +334,13 @@ export default function BuilderPage() {
           title: `${baseTitle} (копия)`,
           description: test.description || '',
         };
+        const copiedMetrics = Array.isArray(cfg.metrics) ? cfg.metrics : [];
         const schema: SurveySchema = {
           questions: qs,
           formulas: [],
           reportTemplates: [],
           clientDataConfig: clientCfg,
+          metrics: copiedMetrics,
           builderDraftMeta: newSettings,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(schema));
@@ -308,6 +348,7 @@ export default function BuilderPage() {
         setQuestions(qs);
         setExpandedQuestions(new Set(qs.map(q => q.id)));
         setClientDataConfig(clientCfg);
+        setMetrics(copiedMetrics);
         setTestSettings(newSettings);
         router.replace('/builder');
       })
@@ -606,13 +647,12 @@ export default function BuilderPage() {
   };
 
   const handleExitEditMode = useCallback(() => {
-    // Просто выходим из режима редактирования - очищаем testId из URL
-    // Вопросы и настройки сохраняются в localStorage как новый проект
     const schema: SurveySchema = {
       questions,
       formulas: [],
       reportTemplates: [],
       clientDataConfig,
+      metrics,
       builderDraftMeta: {
         title: testSettings.title,
         description: testSettings.description,
@@ -621,7 +661,7 @@ export default function BuilderPage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(schema));
     skipLocalStorageLoadOnceRef.current = true;
     router.replace('/builder');
-  }, [questions, clientDataConfig, testSettings, router]);
+  }, [questions, clientDataConfig, testSettings, metrics, router]);
 
   const handleExportSchema = () => {
     const schema: SurveySchema = {
@@ -629,6 +669,7 @@ export default function BuilderPage() {
       formulas: [],
       reportTemplates: [],
       clientDataConfig,
+      metrics,
     };
     const dataStr = JSON.stringify(schema, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
@@ -671,6 +712,7 @@ export default function BuilderPage() {
             description: m.description,
           }));
         }
+        setMetrics(Array.isArray(parsed.metrics) ? parsed.metrics : []);
         setSelectedQuestionId(null);
         alert(`Импорт выполнен. Вопросов: ${parsed.questions.length}.`);
       } catch (err) {
@@ -721,11 +763,15 @@ export default function BuilderPage() {
     setConfirmDialog({
       open: true,
       title: 'Удалить все вопросы',
-      description: 'Вы уверены, что хотите удалить все вопросы? Это действие нельзя отменить.',
+      description:
+        'Будут удалены все вопросы, метрики и настройки черновика. Это действие нельзя отменить.',
       action: () => {
         setQuestions([]);
         setExpandedQuestions(new Set());
         setSelectedQuestionId(null);
+        setMetrics([]);
+        setClientDataConfig(DEFAULT_CLIENT_DATA_CONFIG);
+        setTestSettings({ title: 'Новый тест', description: '' });
         localStorage.removeItem(STORAGE_KEY);
         setConfirmDialog(prev => ({ ...prev, open: false }));
       },
@@ -1421,111 +1467,6 @@ export default function BuilderPage() {
                                 />
                               </div>
                             </div>
-                            
-                            {/* Назначение метрик для шкалы */}
-                            {metrics.length >= 2 && (
-                              <div className="rounded-lg border bg-muted/50 p-3">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                  </svg>
-                                  <Label className="text-sm font-medium">Метрики на шкале</Label>
-                                </div>
-                                <p className="text-xs text-muted-foreground mb-3">
-                                  Выберите 2 метрики для шкалы. Баллы распределяются пропорционально близости ответа к значению метрики.
-                                </p>
-                                <div className="space-y-3">
-                                  {(() => {
-                                    const currentMetricValues = (question as any).metricValues || {};
-                                    const selectedMetricIds = Object.keys(currentMetricValues).filter(id => currentMetricValues[id] !== '' && currentMetricValues[id] !== null && currentMetricValues[id] !== undefined);
-                                    const availableMetrics = metrics.filter(m => !selectedMetricIds.includes(m.id) || selectedMetricIds.includes(m.id));
-                                    
-                                    return (
-                                      <>
-                                        {/* Выбранные метрики */}
-                                        {selectedMetricIds.slice(0, 2).map((metricId, index) => {
-                                          const metric = metrics.find(m => m.id === metricId);
-                                          if (!metric) return null;
-                                          
-                                          return (
-                                            <div key={metricId} className="flex items-center gap-2 p-2 rounded-md bg-background border">
-                                              <div
-                                                className="w-3 h-3 rounded shrink-0"
-                                                style={{ backgroundColor: metric.color }}
-                                              />
-                                              <Label className="text-xs flex-1 font-medium">{metric.name}</Label>
-                                              <Input
-                                                type="number"
-                                                placeholder={`Позиция на шкале (${question.min || 0}-${question.max || 10})`}
-                                                value={currentMetricValues[metricId] ?? ''}
-                                                onChange={(e) => {
-                                                  const metricValue = e.target.value === '' ? '' : parseFloat(e.target.value);
-                                                  const newMetricValues = { ...currentMetricValues };
-                                                  if (metricValue === '') {
-                                                    delete newMetricValues[metricId];
-                                                  } else {
-                                                    newMetricValues[metricId] = metricValue;
-                                                  }
-                                                  handleUpdateQuestion(question.id, {
-                                                    ...(question as any),
-                                                    metricValues: newMetricValues,
-                                                  } as any);
-                                                }}
-                                                className="w-[140px] h-8 text-xs"
-                                              />
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-8 w-8 p-0"
-                                                onClick={() => {
-                                                  const newMetricValues = { ...currentMetricValues };
-                                                  delete newMetricValues[metricId];
-                                                  handleUpdateQuestion(question.id, {
-                                                    ...(question as any),
-                                                    metricValues: newMetricValues,
-                                                  } as any);
-                                                }}
-                                              >
-                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                              </Button>
-                                            </div>
-                                          );
-                                        })}
-                                        
-                                        {/* Добавить метрику если меньше 2 */}
-                                        {selectedMetricIds.length < 2 && (
-                                          <div className="flex items-center gap-2">
-                                            <select
-                                              className="flex h-8 w-full max-w-[200px] items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                              value=""
-                                              onChange={(e) => {
-                                                const metricId = e.target.value;
-                                                if (metricId) {
-                                                  const newMetricValues = { ...currentMetricValues, [metricId]: question.min || 0 };
-                                                  handleUpdateQuestion(question.id, {
-                                                    ...(question as any),
-                                                    metricValues: newMetricValues,
-                                                  } as any);
-                                                }
-                                              }}
-                                            >
-                                              <option value="">Выберите метрику...</option>
-                                              {metrics.filter(m => !selectedMetricIds.includes(m.id)).map(metric => (
-                                                <option key={metric.id} value={metric.id}>
-                                                  {metric.name}
-                                                </option>
-                                              ))}
-                                            </select>
-                                          </div>
-                                        )}
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )}
 
@@ -1653,6 +1594,20 @@ function OptionWithMetricPoints({
   handleUpdateQuestion,
 }: OptionWithMetricPointsProps) {
   const [showMetricPoints, setShowMetricPoints] = useState(false);
+  const [metricFilter, setMetricFilter] = useState('');
+
+  useEffect(() => {
+    if (!showMetricPoints) setMetricFilter('');
+  }, [showMetricPoints]);
+
+  const filteredMetrics = useMemo(() => {
+    const q = metricFilter.trim().toLowerCase();
+    if (!q) return metrics;
+    return metrics.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+    );
+  }, [metrics, metricFilter]);
 
   return (
     <div className="space-y-2">
@@ -1713,7 +1668,18 @@ function OptionWithMetricPoints({
       {showMetricPoints && metrics.length > 0 && (
         <div className="ml-2 p-3 border rounded-md bg-muted/50 space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Баллы по метрикам:</p>
-          {metrics.map((metric) => {
+          <Input
+            type="search"
+            value={metricFilter}
+            onChange={(e) => setMetricFilter(e.target.value)}
+            placeholder="Поиск метрики…"
+            className="h-8 text-xs"
+            aria-label="Поиск метрики"
+          />
+          {filteredMetrics.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Нет метрик по запросу</p>
+          ) : null}
+          {filteredMetrics.map((metric) => {
             const assignment = option.metricAssignments?.find(a => a.metricId === metric.id);
             return (
               <div key={metric.id} className="flex items-center gap-2">
@@ -1765,6 +1731,18 @@ interface MetricsDialogProps {
 function MetricsDialog({ open, onOpenChange, metrics, setMetrics }: MetricsDialogProps) {
   const [editingMetric, setEditingMetric] = useState<Metric | null>(null);
   const [newMetricName, setNewMetricName] = useState('');
+  const [metricSearch, setMetricSearch] = useState('');
+
+  const filteredMetrics = useMemo(() => {
+    const q = metricSearch.trim().toLowerCase();
+    if (!q) return metrics;
+    return metrics.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.id.toLowerCase().includes(q) ||
+        (m.description ?? '').toLowerCase().includes(q)
+    );
+  }, [metrics, metricSearch]);
 
   const handleAddMetric = () => {
     if (!newMetricName.trim()) return;
@@ -1789,7 +1767,13 @@ function MetricsDialog({ open, onOpenChange, metrics, setMetrics }: MetricsDialo
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setMetricSearch('');
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Управление метриками</DialogTitle>
@@ -1824,8 +1808,21 @@ function MetricsDialog({ open, onOpenChange, metrics, setMetrics }: MetricsDialo
             </div>
           ) : (
             <div className="space-y-3">
-              <Label>Существующие метрики</Label>
-              {metrics.map((metric) => (
+              <div className="space-y-2">
+                <Label htmlFor="metrics-dialog-search">Существующие метрики</Label>
+                <Input
+                  id="metrics-dialog-search"
+                  type="search"
+                  value={metricSearch}
+                  onChange={(e) => setMetricSearch(e.target.value)}
+                  placeholder="Поиск по названию"
+                  className="max-w-md"
+                />
+              </div>
+              {filteredMetrics.length === 0 && metricSearch.trim() ? (
+                <p className="text-sm text-muted-foreground py-4">Нет метрик по запросу</p>
+              ) : null}
+              {filteredMetrics.map((metric) => (
                 <Card key={metric.id}>
                   <CardContent className="pt-4">
                     <div className="space-y-3">

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.base import Base
+from app.db.schema_migrations import ensure_users_specialization_column
 from app.db.session import SessionLocal, engine, get_db
 from app.models import Role, User
 from app.routers import admin, auth, panel, psychologist, public
@@ -54,6 +55,7 @@ def ensure_initial_admin() -> None:
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    ensure_users_specialization_column(engine)
     ensure_initial_admin()
 
 

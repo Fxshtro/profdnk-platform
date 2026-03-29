@@ -1,16 +1,26 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { psychologistApi } from '@/lib/api/psychologist';
+import { psychologistApi, type Submission } from '@/lib/api/psychologist';
+import { countQuestionsInTest } from '@/lib/metrics-display';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const NOW_TS = Date.now();
+
+function SubmissionProgressBadge({ submission }: { submission: Submission }): ReactElement {
+  const total = countQuestionsInTest(submission.test);
+  const answered = typeof submission.score === 'number' ? submission.score : 0;
+  if (total > 0) {
+    return <Badge variant="secondary">{answered}/{total} отвечено</Badge>;
+  }
+  return <Badge variant="outline">Ответов: {answered}</Badge>;
+}
 
 export default function ResultsPage() {
   const { data: submissions = [], isLoading, isError } = useQuery({
@@ -96,7 +106,7 @@ export default function ResultsPage() {
                 <TableHead>Клиент</TableHead>
                 <TableHead>Тест</TableHead>
                 <TableHead>Дата прохождения</TableHead>
-                <TableHead>Результаты</TableHead>
+                <TableHead>Прохождение</TableHead>
                 <TableHead className="text-right">Действия</TableHead>
               </TableRow>
             </TableHeader>
@@ -143,16 +153,7 @@ export default function ResultsPage() {
                     })}
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1 flex-wrap">
-                      {Object.entries(result.metrics || {}).map(([metricName, value]) => (
-                        <Badge key={metricName} variant="secondary">
-                          {metricName}: {String(value)}
-                        </Badge>
-                      ))}
-                      {(!result.metrics || Object.keys(result.metrics).length === 0) && (
-                        <Badge variant="outline">Score: {result.score}</Badge>
-                      )}
-                    </div>
+                    <SubmissionProgressBadge submission={result} />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

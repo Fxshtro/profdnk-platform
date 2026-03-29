@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { psychologistApi, type Psychologist } from '@/lib/api/psychologist';
+import { isPsychologistSubscriptionActive } from '@/lib/subscription-active';
 
 export default function AdminSubscriptionsPage() {
   const queryClient = useQueryClient();
@@ -22,7 +23,6 @@ export default function AdminSubscriptionsPage() {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [psychologistToReset, setPsychologistToReset] = useState<number | null>(null);
   const [extendDays, setExtendDays] = useState('30');
-  const nowTs = useMemo(() => Date.now(), []);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin-subscriptions'] });
 
@@ -61,14 +61,6 @@ export default function AdminSubscriptionsPage() {
 
   const handleCancel = (id: number) => {
     cancelMutation.mutate(id);
-  };
-
-  const isSubscriptionActive = (psychologist: Psychologist) => {
-    if (!psychologist.is_active || psychologist.is_blocked) return false;
-    if (!psychologist.access_expires_at) return false;
-    const endDate = new Date(psychologist.access_expires_at);
-    const daysUntilExpiry = Math.max(0, Math.ceil((endDate.getTime() - nowTs) / (1000 * 60 * 60 * 24)));
-    return daysUntilExpiry > 0;
   };
 
   const handleReset = (id: number) => {
@@ -149,7 +141,8 @@ export default function AdminSubscriptionsPage() {
             </TableHeader>
             <TableBody>
               {psychologists.map((psychologist) => {
-                const isActive = isSubscriptionActive(psychologist);
+                const nowTs = Date.now();
+                const isActive = isPsychologistSubscriptionActive(psychologist, nowTs);
                 const endDate = psychologist.access_expires_at
                   ? new Date(psychologist.access_expires_at)
                   : null;

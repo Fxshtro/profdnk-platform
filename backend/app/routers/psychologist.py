@@ -6,7 +6,7 @@ from typing import Optional
 import qrcode
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy.orm import joinedload
 from sqlalchemy.orm import Session
 
@@ -233,6 +233,8 @@ def qr_card(request: Request, user: User = Depends(require_psychologist)):
 
 
 class ProfileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     email: str
     phone: Optional[str]
@@ -242,13 +244,22 @@ class ProfileOut(BaseModel):
     is_blocked: bool
     access_expires_at: Optional[datetime]
     about_md: str
+    specialization: str
     created_at: datetime
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def role_to_str(cls, v: object) -> str:
+        if hasattr(v, "value"):
+            return str(getattr(v, "value"))
+        return str(v)
 
 
 class ProfileUpdateIn(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
     about_md: Optional[str] = None
+    specialization: Optional[str] = None
 
 
 @router.get("/profile", response_model=ProfileOut)
@@ -270,6 +281,8 @@ def update_profile(
         user.phone = payload.phone.strip() if payload.phone.strip() else None
     if payload.about_md is not None:
         user.about_md = payload.about_md
+    if payload.specialization is not None:
+        user.specialization = payload.specialization.strip()
     db.commit()
     db.refresh(user)
     return user

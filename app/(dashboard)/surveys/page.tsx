@@ -138,7 +138,7 @@ export default function SurveysPage() {
             Управление созданными тестами и методиками
           </p>
         </div>
-        <Link href="/builder">
+        <Link href="/builder?new=1">
           <Button>Создать тест</Button>
         </Link>
       </div>

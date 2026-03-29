@@ -265,46 +265,6 @@ export default function ClientSurveyPage() {
         optionsCount: question.options?.length,
       });
 
-      if (question.type === 'scale' && question.metricValues) {
-        const answerNum = typeof answerValue === 'number' ? answerValue : parseFloat(String(answerValue));
-        
-        if (!isNaN(answerNum) && Object.keys(question.metricValues).length > 0) {
-          const metricEntries: Array<{ metricId: string; value: number; distance: number }> = [];
-
-          Object.entries(question.metricValues).forEach(([metricId, metricValue]) => {
-            if (metricValue === null || metricValue === undefined) return;
-            const numValue = typeof metricValue === 'string' ? parseFloat(metricValue) : metricValue;
-            if (isNaN(numValue)) return;
-            
-            const distance = Math.abs(answerNum - numValue);
-            metricEntries.push({ metricId, value: numValue, distance });
-          });
-          
-          if (metricEntries.length === 0) return;
-
-          const totalInverseDistance = metricEntries.reduce((sum, entry) => {
-            return sum + 1 / (entry.distance + 0.1);
-          }, 0);
-
-          metricEntries.forEach(entry => {
-            const inverseDistance = 1 / (entry.distance + 0.1);
-            const proportion = inverseDistance / totalInverseDistance;
-            const points = proportion; // 1 балл распределяется пропорционально
-            
-            if (metricScores[entry.metricId] !== undefined) {
-              metricScores[entry.metricId] += points;
-            }
-          });
-          
-          console.log('[Scale Proportional]', {
-            answerValue: answerNum,
-            metrics: metricEntries,
-            totalInverseDistance,
-          });
-        }
-        return;
-      }
-
       const matchingOption = question.options?.find(opt => {
         const optObj = typeof opt === 'string' ? { value: opt, score: 0 } : opt;
         const optValue = optObj.value;

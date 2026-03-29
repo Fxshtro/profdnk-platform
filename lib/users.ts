@@ -122,7 +122,7 @@ export function getAllPsychologists(): User[] {
 }
 
 export interface Application {
-  id: string;
+  id: string | number;
   fullName: string;
   email: string;
   phone: string;
@@ -145,9 +145,9 @@ export function saveApplication(application: Application): void {
   localStorage.setItem('applications', JSON.stringify(applications));
 }
 
-export function updateApplication(id: string, updates: Partial<Application>): void {
+export function updateApplication(id: string | number, updates: Partial<Application>): void {
   const applications = getApplications();
-  const index = applications.findIndex(a => a.id === id);
+  const index = applications.findIndex(a => String(a.id) === String(id));
   
   if (index !== -1) {
     applications[index] = { ...applications[index], ...updates };

@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { psychologistApi } from '@/lib/api/psychologist';
 import { ProfileQRCode } from '@/components/features/ProfileQRCode';
 import { cn } from '@/lib/utils';
+import { filterPhoneDigits } from '@/lib/phone-digits';
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
@@ -23,6 +24,7 @@ export default function ProfilePage() {
     full_name: '',
     phone: '',
     about_md: '',
+    specialization: '',
   });
 
   const { data: profile, isLoading } = useQuery({
@@ -59,6 +61,7 @@ export default function ProfilePage() {
         full_name: profile.full_name || '',
         phone: profile.phone || '',
         about_md: profile.about_md || '',
+        specialization: profile.specialization ?? '',
       });
       setIsEditing(true);
     }
@@ -70,15 +73,25 @@ export default function ProfilePage() {
       full_name: '',
       phone: '',
       about_md: '',
+      specialization: '',
     });
   };
 
   const handleSave = () => {
-    updateMutation.mutate(formData);
+    if (profile?.role === 'psychologist') {
+      updateMutation.mutate(formData);
+    } else {
+      updateMutation.mutate({
+        full_name: formData.full_name,
+        phone: formData.phone,
+        about_md: formData.about_md,
+      });
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    const next = field === 'phone' ? filterPhoneDigits(value) : value;
+    setFormData(prev => ({ ...prev, [field]: next }));
   };
 
   const requestCloseQrPanel = useCallback(() => {
@@ -221,9 +234,11 @@ export default function ProfilePage() {
               {isEditing ? (
                 <Input
                   id="phone"
+                  type="tel"
+                  inputMode="numeric"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="+7 (999) 000-00-00"
+                  placeholder="79990001122"
                 />
               ) : (
                 <Input value={profile?.phone || 'Не указан'} disabled />
@@ -237,6 +252,26 @@ export default function ProfilePage() {
                 disabled
               />
             </div>
+
+            {profile?.role === 'psychologist' ? (
+              <div className="space-y-2">
+                <Label htmlFor="specialization">Специализация</Label>
+                {isEditing ? (
+                  <Input
+                    id="specialization"
+                    value={formData.specialization}
+                    onChange={(e) => handleInputChange('specialization', e.target.value)}
+                    placeholder="Например: профориентолог, карьерный консультант"
+                  />
+                ) : (
+                  <Input
+                    value={profile.specialization?.trim() || 'Не указана'}
+                    disabled
+                    className={!profile.specialization?.trim() ? 'text-muted-foreground' : ''}
+                  />
+                )}
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <Label>Статус подписки</Label>

@@ -5,12 +5,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import CreatePsychologistDialog from '@/components/features/admin/create-psychologist-dialog';
 import { psychologistApi, type Psychologist } from '@/lib/api/psychologist';
-import { ApiError } from '@/lib/api/client';
+import { isPsychologistSubscriptionActive } from '@/lib/subscription-active';
 
 export default function AdminPsychologistsPage() {
   const queryClient = useQueryClient();
@@ -27,11 +27,12 @@ export default function AdminPsychologistsPage() {
 
   const filteredPsychologists = psychologistsState.filter((psychologist) => {
     const matchesSearch = psychologist.full_name.toLowerCase().includes(searchQuery.toLowerCase());
+    const subActive = isPsychologistSubscriptionActive(psychologist);
 
     const matchesSubscription =
       subscriptionFilter === 'all' ||
-      (subscriptionFilter === 'active' && psychologist.is_active) ||
-      (subscriptionFilter === 'inactive' && !psychologist.is_active);
+      (subscriptionFilter === 'active' && subActive) ||
+      (subscriptionFilter === 'inactive' && !subActive);
 
     const matchesStatus =
       statusFilter === 'all' ||
@@ -41,15 +42,6 @@ export default function AdminPsychologistsPage() {
     return matchesSearch && matchesSubscription && matchesStatus;
   });
 
-  const createMutation = useMutation({
-    mutationFn: (payload: { full_name: string; email: string; password: string; phone?: string }) =>
-      psychologistApi.createPsychologist(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-psychologists'] });
-      setShowCreateDialog(false);
-    },
-  });
-
   const updateMutation = useMutation({
     mutationFn: ({ id, is_blocked, is_active }: { id: number; is_blocked?: boolean; is_active?: boolean }) =>
       psychologistApi.updatePsychologist(id, { is_blocked, is_active }),
@@ -57,15 +49,6 @@ export default function AdminPsychologistsPage() {
       queryClient.invalidateQueries({ queryKey: ['admin-psychologists'] });
     },
   });
-
-  const handleCreate = (formData: FormData) => {
-    createMutation.mutate({
-      full_name: String(formData.get('fullName') || '').trim(),
-      email: String(formData.get('email') || '').trim(),
-      password: String(formData.get('password') || ''),
-      phone: String(formData.get('phone') || '').trim() || undefined,
-    });
-  };
 
   const handleBlock = (id: number) => {
     updateMutation.mutate({ id, is_blocked: true, is_active: false });
@@ -164,7 +147,9 @@ export default function AdminPsychologistsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPsychologists.map((psychologist) => (
+                {filteredPsychologists.map((psychologist) => {
+                  const subscriptionOk = isPsychologistSubscriptionActive(psychologist);
+                  return (
                   <TableRow key={psychologist.id}>
                     <TableCell className="font-medium">
                       {psychologist.full_name}
@@ -173,9 +158,9 @@ export default function AdminPsychologistsPage() {
                     <TableCell className="hidden md:table-cell">{psychologist.email}</TableCell>
                     <TableCell className="hidden lg:table-cell">
                       <Badge
-                        variant={psychologist.is_active ? 'success' : 'secondary'}
+                        variant={subscriptionOk ? 'success' : 'secondary'}
                       >
-                        {psychologist.is_active ? 'Активна' : 'Не активна'}
+                        {subscriptionOk ? 'Активна' : 'Не активна'}
                       </Badge>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
@@ -195,66 +180,15 @@ export default function AdminPsychologistsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+                })}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
 
-      {/* Create Psychologist Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Создать аккаунт психолога</DialogTitle>
-            <DialogDescription>
-              Заполните данные для создания нового аккаунта специалиста
-            </DialogDescription>
-          </DialogHeader>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.currentTarget);
-              handleCreate(formData);
-            }}
-            className="space-y-4"
-          >
-            {createMutation.isError && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive">
-                {createMutation.error instanceof ApiError
-                  ? createMutation.error.message
-                  : 'Не удалось создать аккаунт. Проверьте данные и попробуйте снова.'}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="fullName">ФИО</Label>
-              <Input id="fullName" name="fullName" placeholder="Иванов Иван Иванович" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="email@example.com" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Телефон</Label>
-              <Input id="phone" name="phone" placeholder="+7 (999) 000-00-00" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Пароль (минимум 8 символов)</Label>
-              <Input id="password" name="password" type="password" minLength={8} required />
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowCreateDialog(false)}>
-                Отмена
-              </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Создание...' : 'Создать'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreatePsychologistDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} initial={null} />
 
       {/* Psychologist Details Dialog */}
       <Dialog open={!!selectedPsychologist} onOpenChange={(open) => !open && setSelectedPsychologist(null)}>
@@ -289,8 +223,12 @@ export default function AdminPsychologistsPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Подписка</p>
-                  <Badge variant={selectedPsychologist.is_active ? 'success' : 'secondary'}>
-                    {selectedPsychologist.is_active ? 'Активна' : 'Не активна'}
+                  <Badge
+                    variant={
+                      isPsychologistSubscriptionActive(selectedPsychologist) ? 'success' : 'secondary'
+                    }
+                  >
+                    {isPsychologistSubscriptionActive(selectedPsychologist) ? 'Активна' : 'Не активна'}
                   </Badge>
                 </div>
                 <div>
