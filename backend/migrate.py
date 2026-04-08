@@ -5,7 +5,7 @@
 from sqlalchemy import create_engine, text
 
 # Подключение к PostgreSQL
-DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/profdnk?schema=public"
+DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/profdnk"
 
 def run_migration():
     print("Подключение к базе данных...")

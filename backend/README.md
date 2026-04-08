@@ -34,7 +34,7 @@
 
     Создайте файл .env в директории backend/:
 
-      1 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/profdnk?schema=public
+      1 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/profdnk
       2 USE_SQLITE=false
       3
       4 JWT_SECRET_KEY=your-secret-key-change-in-production

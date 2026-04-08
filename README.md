@@ -164,7 +164,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 Create a `.env` file in the `backend/` directory:
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/profdnk?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/profdnk
 USE_SQLITE=false
 
 JWT_SECRET_KEY=your-secret-key-change-in-production
@@ -178,17 +178,50 @@ INITIAL_ADMIN_PASSWORD=admin123
 INITIAL_ADMIN_FULL_NAME=Administrator
 ```
 
-### Database Setup
+### PostgreSQL
+
+**Install** PostgreSQL 15+ and ensure the service is running.
+
+**Create a database** (name must match the last segment of `DATABASE_URL`, default is `profdnk`):
 
 ```bash
-# Create database
 psql -U postgres
-CREATE DATABASE profdnk;
-\q
+```
 
-# Apply schema
+```sql
+CREATE DATABASE profdnk;
+```
+
+Exit `psql` with `\q` (or close the terminal).
+
+**Apply the schema** from the repository root:
+
+```bash
+psql -U postgres -d profdnk -f "C:\profdnk-platform\backend\database\schema.sql"
+```
+
+Or from the `backend/` directory:
+
+```bash
 psql -U postgres -d profdnk -f database/schema.sql
 ```
+
+**Drop and recreate** the database (e.g. after schema changes or a clean reinstall). Terminate active connections first if the DB is in use:
+
+```bash
+psql -U postgres
+```
+
+```sql
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'profdnk' AND pid <> pg_backend_pid();
+DROP DATABASE IF EXISTS profdnk;
+CREATE DATABASE profdnk;
+```
+
+Then exit `psql` (`\q`) and apply `schema.sql` again as above.
+
+> [!NOTE]
+> Do **not** add `?schema=public` to `DATABASE_URL`. PostgreSQL uses the `public` schema by default, and `psycopg2` rejects that query string as an invalid connection option.
 
 ### Apply Migrations
 
@@ -203,7 +236,7 @@ Edit `.env` in `backend/`:
 
 ```env
 # For PostgreSQL
-DATABASE_URL=postgresql://user:password@host:port/database?schema=public
+DATABASE_URL=postgresql://user:password@host:port/database
 USE_SQLITE=false
 
 # For SQLite (development)
@@ -481,7 +514,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 Создайте файл `.env` в директории `backend/`:
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/profdnk?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/profdnk
 USE_SQLITE=false
 
 JWT_SECRET_KEY=your-secret-key-change-in-production
@@ -495,17 +528,50 @@ INITIAL_ADMIN_PASSWORD=admin123
 INITIAL_ADMIN_FULL_NAME=Администратор
 ```
 
-### Настройка базы данных
+### PostgreSQL
+
+**Установите** PostgreSQL 15+ и убедитесь, что служба запущена.
+
+**Создайте базу данных** (имя должно совпадать с последним сегментом `DATABASE_URL`, по умолчанию `profdnk`):
 
 ```bash
-# Создание БД
 psql -U postgres
-CREATE DATABASE profdnk;
-\q
+```
 
-# Применение схемы
+```sql
+CREATE DATABASE profdnk;
+```
+
+Выйдите из `psql` командой `\q` (или закройте терминал).
+
+**Примените схему** из корня репозитория:
+
+```bash
+psql -U postgres -d profdnk -f "C:\profdnk-platform\backend\database\schema.sql"
+```
+
+Или из каталога `backend/`:
+
+```bash
 psql -U postgres -d profdnk -f database/schema.sql
 ```
+
+**Удалите и пересоздайте** БД (например, после правок схемы или чистой переустановки). Сначала завершите активные подключения, если база используется:
+
+```bash
+psql -U postgres
+```
+
+```sql
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'profdnk' AND pid <> pg_backend_pid();
+DROP DATABASE IF EXISTS profdnk;
+CREATE DATABASE profdnk;
+```
+
+Затем выйдите из `psql` (`\q`) и снова примените `schema.sql`, как выше.
+
+> [!NOTE]
+> **Не** добавляйте `?schema=public` в `DATABASE_URL`. Схема `public` в PostgreSQL используется по умолчанию, а `psycopg2` не принимает такой query-параметр и выдаёт ошибку подключения.
 
 ### Применение миграций
 
@@ -520,7 +586,7 @@ python migrate.py
 
 ```env
 # Для PostgreSQL
-DATABASE_URL=postgresql://user:password@host:port/database?schema=public
+DATABASE_URL=postgresql://user:password@host:port/database
 USE_SQLITE=false
 
 # Для SQLite (разработка)

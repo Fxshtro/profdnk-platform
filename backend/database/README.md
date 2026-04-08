@@ -49,7 +49,7 @@ psql -U postgres -d profdnk -f backend/database/schema.sql
 Создайте файл `.env` в папке `backend/`:
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/profdnk?schema=public
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/profdnk
 USE_SQLITE=false
 
 JWT_SECRET_KEY=your-secret-key-change-in-production
